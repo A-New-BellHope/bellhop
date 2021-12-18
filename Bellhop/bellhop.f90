@@ -239,6 +239,14 @@ SUBROUTINE BellhopCore
         NArr = 0
      END SELECT
 
+     ! LP: This initialization was missing (only done once globally). In some
+     ! cases (a source on a boundary), in conjunction with other subtle issues,
+     ! the missing initialization caused the initial state of one ray to be
+     ! dependent on the final state of the previous ray, which is obviously
+     ! non-physical.
+     iSegz = 1
+     iSegr = 1
+     
      CALL EvaluateSSP( xs, c, cimag, gradc, crr, crz, czz, rho, freq, 'TAB' )
      RadMax = 5 * c / freq  ! 5 wavelength max radius
 
@@ -433,6 +441,13 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
   REAL     (KIND=8) :: sss
 
   ! Initial conditions
+  
+  ! LP: This initialization was missing (only done once globally). In some cases
+  ! (a source on a boundary), in conjunction with other subtle issues, the
+  ! missing initialization caused the initial state of one ray to be dependent
+  ! on the final state of the previous ray, which is obviously non-physical.
+  iSegz = 1
+  iSegr = 1
 
   iSmallStepCtr = 0
   CALL EvaluateSSP( xs, c, cimag, gradc, crr, crz, czz, rho, freq, 'TAB' )
@@ -770,5 +785,3 @@ SUBROUTINE Reflect2D( is, HS, BotTop, tBdry, nBdry, kappa, RefC, Npts )
 END SUBROUTINE Reflect2D
 
 END PROGRAM BELLHOP
-
-
