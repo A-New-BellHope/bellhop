@@ -3,6 +3,8 @@ MODULE Step
   USE bellhopMod
   USE sspMod
   IMPLICIT NONE
+  
+  REAL (KIND=8), PARAMETER, PRIVATE :: REL_SNAP = 1.0d-6 ! Relative error/distance from a boundary to snap to it
 CONTAINS
 
   SUBROUTINE Step2D( ray0, ray2, Topx, Topn, Botx, Botn )
@@ -12,6 +14,7 @@ CONTAINS
     ! t denotes the scaled tangent to the ray (previously (rho, zeta))
     ! c * t would be the unit tangent
 
+    USE BdryMod
     TYPE( ray2DPt )    :: ray0, ray1, ray2
     REAL (KIND=8 ), INTENT( IN ) :: Topx( 2 ), Topn( 2 ), Botx( 2 ), Botn( 2 )
     INTEGER            :: iSegz0, iSegr0
@@ -20,6 +23,14 @@ CONTAINS
          c1, cimag1, crr1, crz1, czz1, csq1, cnn1_csq1, &
          c2, cimag2, crr2, crz2, czz2, urayt0( 2 ), urayt1( 2 ), &
          h, halfh, hw0, hw1, ray2n( 2 ), RM, RN, gradcjump( 2 ), cnjump, csjump, w0, w1, rho 
+         
+    WRITE( PRTFile, * )
+    WRITE( PRTFile, * ) 'ray0 x t p q', ray0%x, ray0%t, ray0%p, ray0%q
+    ! WRITE( PRTFile, * ) 'iSegz iSegr', iSegz, iSegr
+    
+    IF ( ray0%x( 1 ) > 420.0 ) THEN
+       STOP 'Enough'
+    END IF
 
     ! The numerical integrator used here is a version of the polygon (a.k.a. midpoint, leapfrog, or Box method), and similar
     ! to the Heun (second order Runge-Kutta method).
@@ -45,6 +56,8 @@ CONTAINS
     ray1%p = ray0%p - halfh * cnn0_csq0 * ray0%q
     ray1%q = ray0%q + halfh * c0        * ray0%p
 
+    ! WRITE( PRTFile, * ) 'ray1 x t p q', ray1%x, ray1%t, ray1%p, ray1%q
+
     ! *** Phase 2
 
     CALL EvaluateSSP( ray1%x, c1, cimag1, gradc1, crr1, crz1, czz1, rho, freq, 'TAB' )
@@ -60,11 +73,15 @@ CONTAINS
 
     CALL ReduceStep2D( ray0%x, urayt1, iSegz0, iSegr0, Topx, Topn, Botx, Botn, h ) ! reduce h to land on boundary
 
+    ! WRITE( PRTFile, * ) 'urayt1', urayt1, 'out h 2', h
+
     ! use blend of f' based on proportion of a full step used.
     w1  = h / ( 2.0d0 * halfh )
     w0  = 1.0d0 - w1
     hw0 = h * w0
     hw1 = h * w1
+    
+    ! WRITE( PRTFile, * ) 'w1 w0 hw0 hw1', w1, w0, hw0, hw1
 
     ray2%x   = ray0%x   + hw0 * urayt0              + hw1 * urayt1
     ray2%t   = ray0%t   - hw0 * gradc0 / csq0       - hw1 * gradc1 / csq1
@@ -72,10 +89,59 @@ CONTAINS
     ray2%q   = ray0%q   + hw0 * c0        * ray0%p  + hw1 * c1        * ray1%p
     ray2%tau = ray0%tau + hw0 / CMPLX( c0, cimag0, KIND=8 ) + hw1 / CMPLX( c1, cimag1, KIND=8 )
 
+    WRITE( PRTFile, * ) 'ray2 x t p q tau', ray2%x, ray2%t, ray2%p, ray2%q, ray2%tau
+
     ray2%Amp       = ray0%Amp
     ray2%Phase     = ray0%Phase
     ray2%NumTopBnc = ray0%NumTopBnc
     ray2%NumBotBnc = ray0%NumBotBnc
+    
+    ! ReduceStep2D aims to put the position exactly on an interface. However,
+    ! since it is not modifying the position directly, but computing a step
+    ! size which is then used to modify the position, rounding errors may cause
+    ! the final position to be slightly before or after the interface. If
+    ! before, the next (very small) step takes the ray over the interface; if
+    ! after, no extra small step is needed. Since rounding errors are
+    ! effectively random, the resulting trajectory receives or doesn't receive
+    ! an extra step randomly. While the extra step is very small, it slightly
+    ! changes all the values after it, potentially leading to divergence later.
+    ! So, if there is an interface very close, snap to it.
+    IF ( ABS( urayt0( 2 ) ) > EPSILON( urayt0( 2 ) ) .OR. ABS( urayt1( 2 ) ) > EPSILON( urayt1( 2 ) ) ) THEN
+       ! Ray has some depth movement component
+       CALL StepSnapTo( ray2%x( 2 ), SSP%z( iSegz0     ) )
+       CALL StepSnapTo( ray2%x( 2 ), SSP%z( iSegz0 + 1 ) )
+    END IF
+    IF ( ABS( DOT_PRODUCT( Topn, ray2%x - Topx )) < REL_SNAP ) THEN
+       ! On the top surface. If the top surface is slanted, doing a correction
+       ! here won't necessarily be any more accurate than the original
+       ! computation. But if it's flat, like usually, we want the exact top
+       ! depth value.
+       IF ( ABS( Topn( 1 ) ) < EPSILON( Topn( 1 ) ) ) THEN
+          ray2%x( 2 ) = Topx( 2 )
+          WRITE( PRTFile, * ) 'Snapped at top', ray2%x
+       END IF
+    END IF
+    IF ( ABS( DOT_PRODUCT( Botn, ray2%x - Botx )) < REL_SNAP ) THEN
+       ! On the bottom surface. If the bottom surface is slanted, doing a
+       ! correction here won't necessarily be any more accurate than the
+       ! original computation. But if it's flat, like usually, we want the
+       ! exact bottom depth value.
+       IF ( ABS( Botn( 1 ) ) < EPSILON( Botn( 1 ) ) ) THEN
+          ray2%x( 2 ) = Topx( 2 )
+          WRITE( PRTFile, * ) 'Snapped at bottom', ray2%x
+       END IF
+    END IF
+    IF ( ABS( urayt0( 1 ) ) > EPSILON( urayt0( 1 ) ) .OR. ABS( urayt1( 1 ) ) > EPSILON( urayt1( 1 ) ) ) THEN
+       ! Ray has some range movement component
+       CALL StepSnapTo( ray2%x( 1 ), rTopSeg( 1 ) ) ! top seg minimum
+       CALL StepSnapTo( ray2%x( 1 ), rTopSeg( 2 ) ) ! top seg maximum
+       CALL StepSnapTo( ray2%x( 1 ), rBotSeg( 1 ) ) ! bot seg minimum
+       CALL StepSnapTo( ray2%x( 1 ), rBotSeg( 2 ) ) ! bot seg maximum
+       IF ( SSP%Type == 'Q' ) THEN
+          CALL StepSnapTo( ray2%x( 1 ), SSP%Seg%r( iSegz0     ) )
+          CALL StepSnapTo( ray2%x( 1 ), SSP%Seg%r( iSegz0 + 1 ) )
+       END IF
+    END IF
 
     ! If we crossed an interface, apply jump condition
 
@@ -174,5 +240,18 @@ CONTAINS
     END IF
 
   END SUBROUTINE ReduceStep2D
+  
+  ! **********************************************************************!
+  
+  SUBROUTINE StepSnapTo( x, tgt )
+    REAL (KIND=8), INTENT( INOUT ) :: x
+    REAL (KIND=8), INTENT( IN    ) :: tgt
+    
+    IF ( ABS( ( x - tgt ) / x ) < REL_SNAP ) THEN
+       WRITE( PRTFile, * ) 'Snapping to', tgt
+       x = tgt
+    END IF
+    
+  END SUBROUTINE StepSnapTo
 
 END MODULE Step
