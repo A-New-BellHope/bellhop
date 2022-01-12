@@ -329,15 +329,22 @@ CONTAINS
 
   ! **********************************************************************!
 
-  SUBROUTINE GetTopSeg( r )
+  SUBROUTINE GetTopSeg( r, t )
 
     ! Get the Top segment info (index and range interval) for range, r
+    ! LP: t: range component of ray tangent. Endpoints of segments are handled
+    ! so that if the ray moves slightly along its current direction, it will
+    ! remain in the same segment.
 
     INTEGER, PARAMETER :: PRTFile = 6
     INTEGER IsegTopT( 1 )
-    REAL (KIND=8), INTENT( IN ) :: r
+    REAL (KIND=8), INTENT( IN ) :: r, t
 
-    IsegTopT = MAXLOC( Top( : )%x( 1 ), Top( : )%x( 1 ) < r )
+    IF ( t > 0.0 ) THEN
+       IsegTopT = MAXLOC( Top( : )%x( 1 ), Top( : )%x( 1 ) <= r )
+    ELSE
+       IsegTopT = MAXLOC( Top( : )%x( 1 ), Top( : )%x( 1 ) <  r )
+    ENDIF
 
     IF ( IsegTopT( 1 ) > 0 .AND. IsegTopT( 1 ) < NatiPts ) THEN  ! IsegTop MUST LIE IN [ 1, NatiPts-1 ]
        IsegTop = IsegTopT( 1 )
@@ -353,15 +360,22 @@ CONTAINS
 
   ! **********************************************************************!
 
-  SUBROUTINE GetBotSeg( r )
+  SUBROUTINE GetBotSeg( r, t )
 
     ! Get the Bottom segment info (index and range interval) for range, r
+    ! LP: t: range component of ray tangent. Endpoints of segments are handled
+    ! so that if the ray moves slightly along its current direction, it will
+    ! remain in the same segment.
 
     INTEGER, PARAMETER :: PRTFile = 6
     INTEGER IsegBotT( 1 )
-    REAL (KIND=8), INTENT( IN ) :: r
-
-    IsegBotT = MAXLOC( Bot( : )%x( 1 ), Bot( : )%x( 1 ) < r )
+    REAL (KIND=8), INTENT( IN ) :: r, t
+    
+    IF ( t > 0.0 ) THEN
+       IsegBotT = MAXLOC( Bot( : )%x( 1 ), Bot( : )%x( 1 ) <= r )
+    ELSE
+       IsegBotT = MAXLOC( Bot( : )%x( 1 ), Bot( : )%x( 1 ) <  r )
+    ENDIF
 
     IF ( IsegBotT( 1 ) > 0 .AND. IsegBotT( 1 ) < NbtyPts ) THEN  ! IsegBot MUST LIE IN [ 1, NbtyPts-1 ]
        IsegBot = IsegBotT( 1 )   
@@ -376,5 +390,3 @@ CONTAINS
   END SUBROUTINE GetBotSeg
 
 END MODULE bdrymod
-
-

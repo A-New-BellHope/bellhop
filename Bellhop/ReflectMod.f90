@@ -63,7 +63,7 @@ CONTAINS
     ! Calculate the change in curvature
     ! Based on formulas given by Muller, Geoph. J. R.A.S., 79 (1984).
 
-    CALL EvaluateSSP2D( ray2D( is1 )%x, c, cimag, gradc, crr, crz, czz, rho, xs, tradial, freq )
+    CALL EvaluateSSP2D( ray2D( is1 )%x, ray2D( is1 )%t, c, cimag, gradc, crr, crz, czz, rho, xs, tradial, freq )
 
     ! incident and reflected (tilde) unit ray tangent and normal
     rayt       = c * ray2D( is  )%t                       ! unit tangent to ray
@@ -172,5 +172,3 @@ CONTAINS
   END SUBROUTINE Reflect2D
 
 END MODULE ReflectMod
-
-

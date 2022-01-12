@@ -24,7 +24,7 @@ CONTAINS
     CHARACTER (LEN=80), INTENT(IN ) :: FileRoot
     INTEGER            :: NPts, NMedia, iostat
     REAL               :: ZMin, ZMax
-    REAL      (KIND=8) :: x( 2 ), c, cimag, gradc( 2 ), crr, crz, czz, rho, sigma, Depth
+    REAL      (KIND=8) :: x( 2 ), t( 2 ), c, cimag, gradc( 2 ), crr, crz, czz, rho, sigma, Depth
     CHARACTER (LEN= 2) :: AttenUnit
     CHARACTER (LEN=10) :: PlotType
 
@@ -79,7 +79,8 @@ CONTAINS
        SSP%z( 2 ) = Bdry%Bot%HS%Depth
     ELSE
        x = [ 0.0D0, Bdry%Bot%HS%Depth ]   ! tells SSP Depth to read to
-       CALL EvaluateSSP( x, c, cimag, gradc, crr, crz, czz, rho, freq, 'INI' )
+       t = [ 0.0, 1.0 ]
+       CALL EvaluateSSP( x, t, c, cimag, gradc, crr, crz, czz, rho, freq, 'INI' )
     ENDIF
 
     Bdry%Top%HS%Depth = SSP%z( 1 )   ! Depth of top boundary is taken from first SSP point

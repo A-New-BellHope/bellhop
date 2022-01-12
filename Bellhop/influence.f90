@@ -191,7 +191,7 @@ CONTAINS
        rayt = ray2D( iS )%c * ray2D( iS )%t   ! unit tangent
        rayn = [ rayt( 2 ), -rayt( 1 ) ]       ! unit normal
 
-       CALL EvaluateSSP( ray2D( iS )%x, c, cimag, gradc, crr, crz, czz, rho, Freq, 'TAB' )
+       CALL EvaluateSSP( ray2D( iS )%x, ray2D( iS )%t, c, cimag, gradc, crr, crz, czz, rho, Freq, 'TAB' )
 
        csq = c * c
        cS  = DOT_PRODUCT( gradc, rayt )

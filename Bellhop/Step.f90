@@ -38,7 +38,7 @@ CONTAINS
 
     ! *** Phase 1 (an Euler step)
 
-    CALL EvaluateSSP( ray0%x, c0, cimag0, gradc0, crr0, crz0, czz0, rho, freq, 'TAB' )
+    CALL EvaluateSSP( ray0%x, ray0%t, c0, cimag0, gradc0, crr0, crz0, czz0, rho, freq, 'TAB' )
 
     csq0      = c0 * c0
     cnn0_csq0 = crr0 * ray0%t( 2 )**2 - 2.0 * crz0 * ray0%t( 1 ) * ray0%t( 2 ) + czz0 * ray0%t( 1 )**2
@@ -60,7 +60,7 @@ CONTAINS
 
     ! *** Phase 2
 
-    CALL EvaluateSSP( ray1%x, c1, cimag1, gradc1, crr1, crz1, czz1, rho, freq, 'TAB' )
+    CALL EvaluateSSP( ray1%x, ray1%t, c1, cimag1, gradc1, crr1, crz1, czz1, rho, freq, 'TAB' )
     csq1      = c1 * c1
     cnn1_csq1 = crr1 * ray1%t( 2 )**2 - 2.0 * crz1 * ray1%t( 1 ) * ray1%t( 2 ) + czz1 * ray1%t( 1 )**2
 
@@ -145,7 +145,7 @@ CONTAINS
 
     ! If we crossed an interface, apply jump condition
 
-    CALL EvaluateSSP( ray2%x, c2, cimag2, gradc2, crr2, crz2, czz2, rho, freq, 'TAB' )
+    CALL EvaluateSSP( ray2%x, ray2%t, c2, cimag2, gradc2, crr2, crz2, czz2, rho, freq, 'TAB' )
     ray2%c = c2
 
     IF ( iSegz /= iSegz0 .OR. iSegr /= iSegr0 ) THEN

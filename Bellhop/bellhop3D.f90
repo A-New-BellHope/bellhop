@@ -111,6 +111,7 @@ SUBROUTINE BellhopCore
   REAL      ( KIND=8 ) :: Tstart, Tstop
   REAL      ( KIND=8 ) :: Amp0, RadMax, S
   REAL      ( KIND=8 ) :: c0, cimag0, gradc( 3 ), cxx, cyy, czz, cxy, cxz, cyz, rho, xs( 3 )
+  REAL      ( KIND=8 ) :: tdummy( 3 )
   REAL      ( KIND=8 ), ALLOCATABLE :: x_rcvrMat( :, :, : ), t_rcvr( :, : )
   COMPLEX   ( KIND=8 ) :: epsilon( 2 )
   COMPLEX, ALLOCATABLE :: P( :, :, : ), U( :, : )
@@ -204,7 +205,8 @@ SUBROUTINE BellhopCore
   
            ! *** Compute 'optimal' beam constant ***
 
-           CALL EvaluateSSP3D( xs, c0, cimag0, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
+           tdummy = [ 0.0, 0.0, 1.0 ]
+           CALL EvaluateSSP3D( xs, tdummy, c0, cimag0, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
            ray2D( 1 )%c = c0
            CALL PickEpsilon( Beam%Type( 1 : 2 ), omega, c0, Angles%Dalpha, Angles%Dbeta, Beam%rLoop, Beam%epsMultiplier, epsilon ) ! beam constant
 
@@ -479,17 +481,18 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
   REAL     (KIND=8) :: x( 3 )                    ! ray coordinate
   REAL     (KIND=8) :: c, cimag, gradc( 2 ), crr, crz, czz, rho
   REAL     (KIND=8) :: DistBegTop, DistEndTop, DistBegBot, DistEndBot ! Distances from ray beginning, end to top and bottom
-  REAL     (KIND=8) :: tradial( 2 ), BotnInt( 3 ), TopnInt( 3 ), s1, s2
+  REAL     (KIND=8) :: tinit( 2 ), tradial( 2 ), BotnInt( 3 ), TopnInt( 3 ), s1, s2
   REAL     (KIND=8) :: z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy
 
   ! *** Initial conditions ***
 
   iSmallStepCtr = 0
+  tinit = [ COS( alpha ), SIN( alpha ) ]
   tradial = [ COS( beta ), SIN( beta ) ]
   ray2D( 1 )%x = [ 0.0D0, xs( 3 ) ]
 
-  CALL EvaluateSSP2D( ray2D( 1 )%x, c, cimag, gradc, crr, crz, czz, rho, xs, tradial, freq )
-  ray2D( 1 )%t         = [ COS( alpha ), SIN( alpha ) ] / c
+  CALL EvaluateSSP2D( ray2D( 1 )%x, tinit, c, cimag, gradc, crr, crz, czz, rho, xs, tradial, freq )
+  ray2D( 1 )%t         = tinit / c
   ray2D( 1 )%p         = [ 1.0, 0.0 ]
   ray2D( 1 )%q         = [ 0.0, 1.0 ]
   ray2D( 1 )%tau       = 0.0
@@ -679,7 +682,7 @@ SUBROUTINE Step2D( ray0, ray2, xs, tradial )
 
   ! *** Phase 1 (an Euler step)
 
-  CALL EvaluateSSP2D( ray0%x, c0, cimag0, gradc0, crr0, crz0, czz0, rho, xs, tradial, freq )
+  CALL EvaluateSSP2D( ray0%x, ray0%t, c0, cimag0, gradc0, crr0, crz0, czz0, rho, xs, tradial, freq )
 
   csq0      = c0 * c0
   cnn0_csq0 = crr0 * ray0%t( 2 )**2 - 2.0 * crz0 * ray0%t( 1 ) * ray0%t( 2 ) + czz0 * ray0%t( 1 )**2
@@ -705,7 +708,7 @@ SUBROUTINE Step2D( ray0, ray2, xs, tradial )
 
   ! *** Phase 2
 
-  CALL EvaluateSSP2D( ray1%x, c1, cimag1, gradc1, crr1, crz1, czz1, rho, xs, tradial, freq )
+  CALL EvaluateSSP2D( ray1%x, ray1%t, c1, cimag1, gradc1, crr1, crz1, czz1, rho, xs, tradial, freq )
   csq1      = c1 * c1
   cnn1_csq1 = crr1 * ray1%t( 2 )**2 - 2.0 * crz1 * ray1%t( 1 ) * ray1%t( 2 ) + czz1 * ray1%t( 1 )**2
 
@@ -738,7 +741,7 @@ SUBROUTINE Step2D( ray0, ray2, xs, tradial )
 
   ! If we crossed an interface, apply jump condition
 
-  CALL EvaluateSSP2D( ray2%x, c2, cimag2, gradc2, crr2, crz2, czz2, rho, xs, tradial, freq )
+  CALL EvaluateSSP2D( ray2%x, ray2%t, c2, cimag2, gradc2, crr2, crz2, czz2, rho, xs, tradial, freq )
   ray2%c = c2
 
   !!! this needs modifying like the full 3D version to handle jumps in the x-y direction
@@ -777,14 +780,16 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
   REAL     (KIND=8) :: TopnInt( 3 ), BotnInt( 3 )
   REAL     (KIND=8) :: s1, s2
   REAL     (KIND=8) :: z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy
+  REAL     (KIND=8) :: tinit( 3 )
 
   ! *** Initial conditions ***
 
   iSmallStepCtr = 0
   ray3D( 1 )%x    = xs
-  CALL EvaluateSSP3D(  ray3D( 1 )%x, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
+  tinit = [ COS( alpha ) * COS( beta ), COS( alpha ) * SIN( beta ), SIN( alpha ) ]
+  CALL EvaluateSSP3D(  ray3D( 1 )%x, ray3D( 1 )%t, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
 
-  ray3D( 1 )%t    = [ COS( alpha ) * COS( beta ) / c, COS( alpha ) * SIN( beta ) / c, SIN( alpha ) / c ]
+  ray3D( 1 )%t    = tinit / c
   !ray3D( 1 )%f    = epsilon( 2 )
   !ray3D( 1 )%g    = epsilon( 1 )
   !ray3D( 1 )%h    = 0.0

@@ -56,7 +56,7 @@ CONTAINS
     ray3D( is1 )%x         = ray3D( is )%x
     ray3D( is1 )%t         = ray3D( is )%t - 2.0 * Th * nBdry   ! reflect the ray
 
-    CALL EvaluateSSP3D( ray3D( is1 )%x, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
+    CALL EvaluateSSP3D( ray3D( is1 )%x, ray3D( is1 )%t, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
     ray3D( is1 )%c         = c
     ray3D( is1 )%tau       = ray3D( is )%tau
 
@@ -260,5 +260,3 @@ CONTAINS
     END SUBROUTINE ParabotFormulas
   END SUBROUTINE Reflect3D
 END MODULE Reflect3DMod
-
-

@@ -35,7 +35,7 @@ CONTAINS
 
     ! *** Phase 1 (an Euler step)
 
-    CALL EvaluateSSP3D( ray0%x, c0, cimag0, gradc0, cxx0, cyy0, czz0, cxy0, cxz0, cyz0, rho, freq, 'TAB' )
+    CALL EvaluateSSP3D( ray0%x, ray0%t, c0, cimag0, gradc0, cxx0, cyy0, czz0, cxy0, cxz0, cyz0, rho, freq, 'TAB' )
     CALL RayNormal( ray0%t, ray0%phi, c0, e1, e2 ) ! Compute ray normals e1 and e2
     CALL Get_c_partials( cxx0, cxy0, cxz0, cyy0, cyz0, czz0, e1, e2, cnn0, cmn0, cmm0 ) ! Compute second partials of c along ray normals
 
@@ -76,7 +76,7 @@ CONTAINS
 
     ! *** Phase 2
 
-    CALL EvaluateSSP3D( ray1%x, c1, cimag1, gradc1, cxx1, cyy1, czz1, cxy1, cxz1, cyz1, rho, freq, 'TAB' )
+    CALL EvaluateSSP3D( ray1%x, ray1%t, c1, cimag1, gradc1, cxx1, cyy1, czz1, cxy1, cxz1, cyz1, rho, freq, 'TAB' )
     rayt = c1 * ray1%t           ! unit tangent to ray
     CALL RayNormal_unit( rayt, ray2%phi, e1, e2 )
     CALL Get_c_partials( cxx1, cxy1, cxz1, cyy1, cyz1, czz1, e1, e2, cnn1, cmn1, cmm1 ) ! Compute second partials of c along ray normals
@@ -122,7 +122,7 @@ CONTAINS
 
     ! *** If we crossed an interface, apply jump condition ***
 
-    CALL EvaluateSSP3D( ray2%x, c2, cimag2, gradc2, cxx2, cyy2, czz2, cxy2, cxz2, cyz2, rho, freq, 'TAB' )
+    CALL EvaluateSSP3D( ray2%x, ray2%t, c2, cimag2, gradc2, cxx2, cyy2, czz2, cxy2, cxz2, cyz2, rho, freq, 'TAB' )
 
     ray2%c = c2
 
@@ -351,4 +351,3 @@ CONTAINS
   END SUBROUTINE ReduceStep3D
 
 END MODULE Step3DMod
-

@@ -154,7 +154,7 @@ SUBROUTINE BellhopCore
   INTEGER, PARAMETER   :: ArrivalsStorage = 20000000, MinNArr = 10
   INTEGER              :: IBPvec( 1 ), ibp, is, iBeamWindow2, Irz1, Irec, NalphaOpt, iSeg
   REAL                 :: Tstart, Tstop
-  REAL        (KIND=8) :: Amp0, DalphaOpt, xs( 2 ), RadMax, s, &
+  REAL        (KIND=8) :: Amp0, DalphaOpt, xs( 2 ), tdummy( 2 ), RadMax, s, &
                           c, cimag, gradc( 2 ), crr, crz, czz, rho
   COMPLEX, ALLOCATABLE :: U( :, : )
   COMPLEX     (KIND=8) :: epsilon
@@ -247,7 +247,8 @@ SUBROUTINE BellhopCore
      iSegz = 1
      iSegr = 1
      
-     CALL EvaluateSSP( xs, c, cimag, gradc, crr, crz, czz, rho, freq, 'TAB' )
+     tdummy = [ 1.0, 0.0 ]
+     CALL EvaluateSSP( xs, tdummy, c, cimag, gradc, crr, crz, czz, rho, freq, 'TAB' )
      RadMax = 5 * c / freq  ! 5 wavelength max radius
 
      ! Are there enough beams?
@@ -439,6 +440,7 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
   REAL     (KIND=8) :: dEndTop( 2 ), dEndBot( 2 ), TopnInt( 2 ), BotnInt( 2 ), ToptInt( 2 ), BottInt( 2 )
   REAL     (KIND=8) :: DistBegTop, DistEndTop, DistBegBot, DistEndBot ! Distances from ray beginning, end to top and bottom
   REAL     (KIND=8) :: sss
+  REAL     (KIND=8) :: tinit( 2 )
 
   ! Initial conditions
   
@@ -450,10 +452,11 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
   iSegr = 1
 
   iSmallStepCtr = 0
-  CALL EvaluateSSP( xs, c, cimag, gradc, crr, crz, czz, rho, freq, 'TAB' )
+  tinit = [ COS( alpha ), SIN( alpha ) ]
+  CALL EvaluateSSP( xs, tinit, c, cimag, gradc, crr, crz, czz, rho, freq, 'TAB' )
   ray2D( 1 )%c         = c
   ray2D( 1 )%x         = xs
-  ray2D( 1 )%t         = [ COS( alpha ), SIN( alpha ) ] / c
+  ray2D( 1 )%t         = tinit / c
   ray2D( 1 )%p         = [ 1.0, 0.0 ]
   ray2D( 1 )%q         = [ 0.0, 1.0 ]
   ray2D( 1 )%tau       = 0.0
@@ -466,8 +469,8 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
   ! set I.C. to 0 in hopes of saving run time
   IF ( Beam%RunType( 2 : 2 ) == 'G' ) ray2D( 1 )%q = [ 0.0, 0.0 ]
 
-  CALL GetTopSeg( xs( 1 ) )   ! identify the top    segment above the source
-  CALL GetBotSeg( xs( 1 ) )   ! identify the bottom segment below the source
+  CALL GetTopSeg( xs( 1 ), ray2D( 1 )%t( 1 ) )   ! identify the top    segment above the source
+  CALL GetBotSeg( xs( 1 ), ray2D( 1 )%t( 1 ) )   ! identify the bottom segment below the source
 
   ! convert range-dependent geoacoustic parameters from user to program units
   ! compiler is not accepting the copy of the whole structure at once ...
@@ -503,9 +506,11 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
           Bot( IsegBot )%x, Bot( IsegBot )%n )
 
      ! New altimetry segment?
-     IF ( ray2D( is1 )%x( 1 ) < rTopSeg( 1 ) .OR. &
-          ray2D( is1 )%x( 1 ) > rTopSeg( 2 ) ) THEN
-        CALL GetTopSeg( ray2D( is1 )%x( 1 ) )
+     IF (        ray2D( is1 )%x( 1 )  < rTopSeg( 1 ) &
+          .OR. ( ray2D( is1 )%x( 1 ) == rTopSeg( 1 ) .AND. ray2D( is1 )%t( 1 ) <  0.0 ) &
+          .OR.   ray2D( is1 )%x( 1 )  > rTopSeg( 2 ) &
+          .OR. ( ray2D( is1 )%x( 1 ) == rTopSeg( 2 ) .AND. ray2D( is1 )%t( 1 ) >= 0.0 )) THEN
+        CALL GetTopSeg( ray2D( is1 )%x( 1 ), ray2D( is1 )%t( 1 ) )
         IF ( atiType( 2 : 2 ) == 'L' ) THEN
            Bdry%Top%HS%cp  = Top( IsegTop )%HS%cp   ! grab the geoacoustic info for the new segment
            Bdry%Top%HS%cs  = Top( IsegTop )%HS%cs
@@ -514,9 +519,11 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
      END IF
 
      ! New bathymetry segment?
-     IF ( ray2D( is1 )%x( 1 ) < rBotSeg( 1 ) .OR. &
-          ray2D( is1 )%x( 1 ) > rBotSeg( 2 ) ) THEN
-        CALL GetBotSeg( ray2D( is1 )%x( 1 ) )
+     IF (        ray2D( is1 )%x( 1 )  < rBotSeg( 1 ) &
+          .OR. ( ray2D( is1 )%x( 1 ) == rBotSeg( 1 ) .AND. ray2D( is1 )%t( 1 ) <  0.0 ) &
+          .OR.   ray2D( is1 )%x( 1 )  > rBotSeg( 2 ) &
+          .OR. ( ray2D( is1 )%x( 1 ) == rBotSeg( 2 ) .AND. ray2D( is1 )%t( 1 ) >= 0.0 )) THEN
+        CALL GetBotSeg( ray2D( is1 )%x( 1 ), ray2D( is1 )%t( 1 ) )
         IF ( btyType( 2 : 2 ) == 'L' ) THEN
            Bdry%Bot%HS%cp  = Bot( IsegBot )%HS%cp   ! grab the geoacoustic info for the new segment
            Bdry%Bot%HS%cs  = Bot( IsegBot )%HS%cs
@@ -641,7 +648,7 @@ SUBROUTINE Reflect2D( is, HS, BotTop, tBdry, nBdry, kappa, RefC, Npts )
   ! Calculate the change in curvature
   ! Based on formulas given by Muller, Geoph. J. R.A.S., 79 (1984).
 
-  CALL EvaluateSSP( ray2D( is )%x, c, cimag, gradc, crr, crz, czz, rho, freq, 'TAB' )   ! just to get c
+  CALL EvaluateSSP( ray2D( is )%x, ray2D( is )%t, c, cimag, gradc, crr, crz, czz, rho, freq, 'TAB' )   ! just to get c
 
   ! incident unit ray tangent and normal
   rayt = c * ray2D( is )%t                              ! unit tangent to ray

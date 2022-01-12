@@ -60,7 +60,7 @@ MODULE sspmod
 
 CONTAINS
 
-  SUBROUTINE EvaluateSSP( x, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
+  SUBROUTINE EvaluateSSP( x, t, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
 
     ! Call the particular profil routine indicated by the SSP%Type and perform Task
     !   Task = 'TAB'  then tabulate cp, cs, rhoT 
@@ -68,29 +68,31 @@ CONTAINS
 
     REAL      (KIND=8), INTENT( IN  ) :: freq
     REAL      (KIND=8), INTENT( IN  ) :: x( 2 )      ! r-z coordinate where SSP is to be evaluated
+    REAL      (KIND=8), INTENT( IN  ) :: t( 2 )   ! ray tangent; for edge cases of updating segments
     CHARACTER ( LEN=3), INTENT( IN  ) :: Task
     REAL      (KIND=8), INTENT( OUT ) :: c, cimag, gradc( 2 ), crr, crz, czz, rho
     REAL      (KIND=8)                :: gradc_3d( 3 ), cxx, cyy, cxy, cxz, cyz
-    REAL      (KIND=8)                :: x3( 3 )
+    REAL      (KIND=8)                :: x3( 3 ), t3( 3 )
 
     SELECT CASE ( SSP%Type )
     CASE ( 'N' )  !  N2-linear profile option
-       CALL n2Linear( x, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
+       CALL n2Linear( x, t, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
     CASE ( 'C' )  !  C-linear profile option
-       CALL cLinear(  x, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
+       CALL cLinear(  x, t, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
     CASE ( 'P' )  !  monotone PCHIP ACS profile option
-       CALL cPCHIP(   x, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
+       CALL cPCHIP(   x, t, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
     CASE ( 'S' )  !  Cubic spline profile option
-       CALL cCubic(   x, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
+       CALL cCubic(   x, t, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
     CASE ( 'Q' )
-       CALL Quad(     x, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
+       CALL Quad(     x, t, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
     CASE ( 'H' )
        ! this is called by BELLHOP3D only once, during READIN
        ! possibly the logic should be changed to call EvaluateSSP2D or 3D
        x3 = [ 0.0D0, 0.0D0, x( 2 ) ]
-       CALL Hexahedral( x3, c, cimag, gradc_3d, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, Task )
+       t3 = [ 0.0D0, 0.0D0, t( 2 ) ]
+       CALL Hexahedral( x3, t3, c, cimag, gradc_3d, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, Task )
     CASE ( 'A' )  !  Analytic profile option
-       CALL Analytic( x, c, cimag, gradc, crr, crz, czz, rho )
+       CALL Analytic( x, t, c, cimag, gradc, crr, crz, czz, rho )
     CASE DEFAULT
        WRITE( PRTFile, * ) 'Profile option: ', SSP%Type
        CALL ERROUT( 'BELLHOP: EvaluateSSP', 'Invalid profile option' )
@@ -100,19 +102,20 @@ CONTAINS
   
 !**********************************************************************!
 
-SUBROUTINE EvaluateSSP2D( x2D, c, cimag, gradc, crr, crz, czz, rho, xs, tradial, freq )
+SUBROUTINE EvaluateSSP2D( x2D, t2D, c, cimag, gradc, crr, crz, czz, rho, xs, tradial, freq )
 
   ! Converts cartesian gradients to polar
   ! Called from BELLHOP3D to get a 2D slice out of the 3D SSP
 
-  REAL (KIND=8), INTENT( IN  ) :: x2D( 2 ), xs( 3 ), tradial( 2 ), freq
+  REAL (KIND=8), INTENT( IN  ) :: x2D( 2 ), t2D( 2 ), xs( 3 ), tradial( 2 ), freq
   REAL (KIND=8), INTENT( OUT ) :: c, cimag, gradc( 2 ), czz, crz, crr, rho
-  REAL (KIND=8)                :: x( 3 ), gradc3D(3 ), cxx, cyy, cxy, cxz, cyz
+  REAL (KIND=8)                :: x( 3 ), t( 3 ), gradc3D(3 ), cxx, cyy, cxy, cxz, cyz
 
   ! convert polar coordinate to cartesian
   x = [ xs( 1 ) + x2D( 1 ) * tradial( 1 ), xs( 2 ) + x2D( 1 ) * tradial( 2 ), x2D( 2 ) ]
+  t = [ xs( 1 ) + t2D( 1 ) * tradial( 1 ), xs( 2 ) + t2D( 1 ) * tradial( 2 ), t2D( 2 ) ]
 
-  CALL EvaluateSSP3D( x, c, cimag, gradc3D, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
+  CALL EvaluateSSP3D( x, t, c, cimag, gradc3D, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
 
   gradc( 1 )  = DOT_PRODUCT( tradial, gradc3D( 1 : 2 ) )  ! r derivative
   gradc( 2 )  = gradc3D( 3 )                              ! z derivative
@@ -125,7 +128,7 @@ END SUBROUTINE EvaluateSSP2D
 
   !**********************************************************************!
 
-  SUBROUTINE EvaluateSSP3D( x, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, Task )
+  SUBROUTINE EvaluateSSP3D( x, t, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, Task )
 
     ! Call the particular profil routine indicated by the SSP%Type and perform Task
     !   Task = 'TAB'  then tabulate cp, cs, rhoT 
@@ -133,23 +136,25 @@ END SUBROUTINE EvaluateSSP2D
 
     REAL      (KIND=8), INTENT( IN  ) :: freq
     REAL      (KIND=8), INTENT( IN  ) :: x( 3 )      ! x-y-z coordinate where SSP is to be evaluated
+    REAL      (KIND=8), INTENT( IN  ) :: t( 3 )      ! ray tangent; for edge cases of updating segments
     CHARACTER ( LEN=3), INTENT( IN  ) :: Task
     REAL      (KIND=8), INTENT( OUT ) :: c, cimag, gradc( 3 ), cxx, cyy, czz, cxy, cxz, cyz, rho
-    REAL      (KIND=8)                :: x_rz( 2 ), gradc_rz( 2 ), crr, crz
+    REAL      (KIND=8)                :: x_rz( 2 ), t_rz( 2 ), gradc_rz( 2 ), crr, crz
 
     x_rz = [ 0.0D0, x( 3 ) ]   ! convert x-y-z coordinate to cylindrical coordinate
+    t_rz = [ 0.0D0, t( 3 ) ]
 
     SELECT CASE ( SSP%Type )
     CASE ( 'N' )
-       CALL n2Linear( x_rz, c, cimag, gradc_rz, crr, crz, czz, rho, freq, Task )
+       CALL n2Linear( x_rz, t_rz, c, cimag, gradc_rz, crr, crz, czz, rho, freq, Task )
     CASE ( 'C' )
-       CALL cLinear(  x_rz, c, cimag, gradc_rz, crr, crz, czz, rho, freq, Task )
+       CALL cLinear(  x_rz, t_rz, c, cimag, gradc_rz, crr, crz, czz, rho, freq, Task )
     CASE ( 'S' )
-       CALL cCubic(   x_rz, c, cimag, gradc_rz, crr, crz, czz, rho, freq, Task )
+       CALL cCubic(   x_rz, t_rz, c, cimag, gradc_rz, crr, crz, czz, rho, freq, Task )
     CASE ( 'H' )
-       CALL Hexahedral( x, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, Task )
+       CALL Hexahedral( x, t, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, Task )
     CASE ( 'A' )
-       CALL Analytic3D( x, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho )
+       CALL Analytic3D( x, t, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho )
     CASE DEFAULT
        WRITE( PRTFile, * ) 'Profile option: ', SSP%Type
        CALL ERROUT( 'BELLHOP3D: EvaluateSSP3D', 'Invalid profile option' )
@@ -170,12 +175,13 @@ END SUBROUTINE EvaluateSSP2D
 
   !**********************************************************************!
 
-  SUBROUTINE n2Linear( x, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
+  SUBROUTINE n2Linear( x, t, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
 
     ! N2-linear interpolation of SSP data
 
     REAL     (KIND=8), INTENT( IN  ) :: freq
     REAL     (KIND=8), INTENT( IN  ) :: x( 2 )   ! r-z coordinate where sound speed is evaluated
+    REAL     (KIND=8), INTENT( IN  ) :: t( 2 )   ! ray tangent; for edge cases of updating segments
     CHARACTER (LEN=3), INTENT( IN  ) :: Task
     REAL     (KIND=8), INTENT( OUT ) :: c, cimag, gradc( 2 ), crr, crz, czz, rho ! sound speed and its derivatives
     
@@ -192,14 +198,7 @@ END SUBROUTINE EvaluateSSP2D
        END DO
     ELSE                         ! return SSP info
 
-       IF ( x( 2 ) < SSP%z( iSegz ) .OR. x( 2 ) > SSP%z( iSegz + 1 ) ) THEN
-          DO iz = 2, SSP%NPts   ! Search for bracketting Depths
-             IF ( x( 2 ) < SSP%z( iz ) ) THEN
-                iSegz = iz - 1
-                EXIT
-             END IF
-          END DO
-       END IF
+       CALL UpdateDepthSegmentT( x, t )
 
        W = ( x( 2 ) - SSP%z( iSegz ) ) / ( SSP%z( iSegz + 1 ) - SSP%z( iSegz ) )
 
@@ -218,12 +217,13 @@ END SUBROUTINE EvaluateSSP2D
 
   !**********************************************************************!
 
-  SUBROUTINE cLinear( x, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
+  SUBROUTINE cLinear( x, t, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
 
     ! c-linear interpolation of SSP data
 
     REAL     (KIND=8), INTENT( IN  ) :: freq
     REAL     (KIND=8), INTENT( IN  ) :: x( 2 )   ! r-z coordinate where sound speed is evaluated
+    REAL     (KIND=8), INTENT( IN  ) :: t( 2 )   ! ray tangent; for edge cases of updating segments
     CHARACTER (LEN=3), INTENT( IN  ) :: Task
     REAL     (KIND=8), INTENT( OUT ) :: c, cimag, gradc( 2 ), crr, crz, czz, rho ! sound speed and its derivatives
     
@@ -231,15 +231,8 @@ END SUBROUTINE EvaluateSSP2D
        Depth     = x( 2 )
        CALL ReadSSP( Depth, freq )
     ELSE                        ! return SSP info
-
-       IF ( x( 2 ) < SSP%z( iSegz ) .OR. x( 2 ) > SSP%z( iSegz + 1 ) ) THEN
-          DO iz = 2, SSP%NPts   ! Search for bracketting Depths
-             IF ( x( 2 ) < SSP%z( iz ) ) THEN
-                iSegz = iz - 1
-                EXIT
-             END IF
-          END DO
-       END IF
+      
+       CALL UpdateDepthSegmentT( x, t )
 
        c     = REAL(  SSP%c( iSegz ) + ( x( 2 ) - SSP%z( iSegz ) ) * SSP%cz( iSegz ) )
        cimag = AIMAG( SSP%c( iSegz ) + ( x( 2 ) - SSP%z( iSegz ) ) * SSP%cz( iSegz ) )
@@ -256,7 +249,7 @@ END SUBROUTINE EvaluateSSP2D
 
   !**********************************************************************!
 
-  SUBROUTINE cPCHIP( x, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
+  SUBROUTINE cPCHIP( x, t, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
 
     ! This implements the new monotone piecewise cubic Hermite interpolating
     ! polynomial (PCHIP) algorithm for the interpolation of the sound speed c.
@@ -264,6 +257,7 @@ END SUBROUTINE EvaluateSSP2D
     USE pchipMod
     REAL     (KIND=8), INTENT( IN  ) :: freq
     REAL     (KIND=8), INTENT( IN  ) :: x( 2 )   ! r-z coordinate where sound speed is evaluated
+    REAL     (KIND=8), INTENT( IN  ) :: t( 2 )   ! ray tangent; for edge cases of updating segments
     CHARACTER (LEN=3), INTENT( IN  ) :: Task
     REAL     (KIND=8), INTENT( OUT ) :: c, cimag, gradc( 2 ), crr, crz, czz, rho ! sound speed and its derivatives
     REAL     (KIND=8) :: xt
@@ -281,15 +275,8 @@ END SUBROUTINE EvaluateSSP2D
        CALL PCHIP( SSP%z, SSP%c, SSP%NPts, SSP%cCoef, SSP%CSWork )
 
     ELSE                        ! return SSP info
-
-       IF ( x( 2 ) < SSP%z( iSegz ) .OR. x( 2 ) > SSP%z( iSegz + 1 ) ) THEN
-          DO iz = 2, SSP%NPts   ! Search for bracketting Depths
-             IF ( x( 2 ) < SSP%z( iz ) ) THEN
-                iSegz = iz - 1
-                EXIT
-             END IF
-          END DO
-       END IF
+      
+       CALL UpdateDepthSegmentT( x, t )
 
        xt = x( 2 ) - SSP%z( iSegz )
        c_cmplx = SSP%cCoef( 1, iSegz ) &
@@ -317,12 +304,13 @@ END SUBROUTINE EvaluateSSP2D
 
   !**********************************************************************!
 
-  SUBROUTINE cCubic( x, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
+  SUBROUTINE cCubic( x, t, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
 
     ! Cubic spline interpolation
 
     REAL     (KIND=8), INTENT( IN )  :: freq
     REAL     (KIND=8), INTENT( IN  ) :: x( 2 )   ! r-z coordinate where sound speed is evaluated
+    REAL     (KIND=8), INTENT( IN  ) :: t( 2 )   ! ray tangent; for edge cases of updating segments
     CHARACTER (LEN=3), INTENT( IN  ) :: Task
     REAL     (KIND=8), INTENT( OUT ) :: c, cimag, gradc( 2 ), crr, crz, czz, rho ! sound speed and its derivatives
     INTEGER                          :: iBCBeg, iBCEnd
@@ -345,16 +333,8 @@ END SUBROUTINE EvaluateSSP2D
     ELSE
 
        ! *** Section to return SSP info ***
-
-       IF ( x( 2 ) < SSP%z( iSegz ) .OR. x( 2 ) > SSP%z( iSegz + 1 ) ) THEN
-          DO iz = 2, SSP%NPts   ! Search for bracketting Depths
-             IF ( x( 2 ) < SSP%z( iz ) ) THEN
-                iSegz = iz - 1
-                EXIT
-             END IF
-          END DO
-
-       END IF
+       
+       CALL UpdateDepthSegmentT( x, t )
 
        hSpline = x( 2 ) - SSP%z( iSegz )
 
@@ -380,13 +360,14 @@ END SUBROUTINE EvaluateSSP2D
 
   !**********************************************************************!
 
-  SUBROUTINE Quad( x, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
+  SUBROUTINE Quad( x, t, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
 
     ! Bilinear quadrilatteral interpolation of SSP data in 2D
 
     INTEGER,           PARAMETER      :: SSPFile = 40
     REAL      (KIND=8), INTENT( IN  ) :: freq
     REAL      (KIND=8), INTENT( IN  ) :: x( 2 )   ! r-z coordinate where sound speed is evaluated
+    REAL      (KIND=8), INTENT( IN  ) :: t( 2 )   ! ray tangent; for edge cases of updating segments
     CHARACTER (LEN=3),  INTENT( IN  ) :: Task
     REAL      (KIND=8), INTENT( OUT ) :: c, cimag, gradc( 2 ), crr, crz, czz, rho ! sound speed and its derivatives
     INTEGER                           :: AllocateStatus, iSegT, iz2
@@ -447,38 +428,8 @@ END SUBROUTINE EvaluateSSP2D
     ELSE
 
        ! *** Section to return SSP info ***
-
-       ! check depth-layer contains x( 2 ) in [ SSP%z( iSegz ), SSP%z( iSegz + 1 ) ]
-       IF ( x( 2 ) < SSP%z( iSegz ) .OR. x( 2 ) > SSP%z( iSegz + 1 ) ) THEN
-          DO iz = 2, SSP%NPts   ! Search for bracketting Depths
-             IF ( x( 2 ) < SSP%z( iz ) ) THEN
-                iSegz = iz - 1
-                EXIT
-             END IF
-          END DO
-       END IF
-
-       ! The following tries to be more efficient than the code above by searching away from the current layer
-       ! rather than searching through all the layers
-       ! However, seems to be no faster
-       ! Also, this code caused a problem on at/tests/Gulf for the range-dep. test cases
-!!$     IF ( x( 2 ) < SSP%z( iSegz ) .AND. iSegz > 1 ) THEN
-!!$        DO iz = iSegz - 1, 1, -1   ! Search for bracketting Depths
-!!$           IF ( x( 2 ) > SSP%z( iz ) ) THEN
-!!$              iSegz = iz
-!!$              EXIT
-!!$           END IF
-!!$        END DO
-!!$     END IF
-!!$
-!!$     IF ( x( 2 ) > SSP%z( iSegz + 1 ) .AND. iSegz < SSP%NPts - 2 ) THEN
-!!$        DO iz = iSegz + 2, SSP%NPts   ! Search for bracketting Depths
-!!$           IF ( x( 2 ) < SSP%z( iz ) ) THEN
-!!$              iSegz = iz - 1
-!!$              EXIT
-!!$           END IF
-!!$        END DO
-!!$     END IF
+       
+       CALL UpdateDepthSegmentT( x, t )
 
        ! Check that x is inside the box where the sound speed is defined
        IF ( x( 1 ) < SSP%Seg%r( 1 ) .OR. x( 1 ) > SSP%Seg%r( SSP%Nr ) ) THEN ! .OR. &
@@ -487,15 +438,7 @@ END SUBROUTINE EvaluateSSP2D
           CALL ERROUT( 'Quad', 'ray is outside the box where the soundspeed is defined' )
        END IF
 
-       ! check range-segment contains x( 1 ) in [ SSP%Seg%r( iSSP%Seg ), SSP%Seg%r( iSegr + 1 ) )
-       IF ( x( 1 ) < SSP%Seg%r( iSegr ) .OR. x( 1 ) >= SSP%Seg%r( iSegr + 1 ) ) THEN
-          DO iSegT = 2, SSP%Nr   ! Search for bracketting segment ranges
-             IF ( x( 1 ) < SSP%Seg%r( iSegT ) ) THEN
-                iSegr = iSegT - 1
-                EXIT
-             END IF
-          END DO
-       END IF
+       CALL UpdateRangeSegmentT( x, t )
 
        ! for this depth, x( 2 ), get the sound speed at both ends of the segment
        cz1 = SSP%czMat( iSegz, iSegr )
@@ -537,7 +480,7 @@ END SUBROUTINE EvaluateSSP2D
 
   !**********************************************************************!
 
-  SUBROUTINE Hexahedral( x, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, Task )
+  SUBROUTINE Hexahedral( x, t, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, Task )
 
     ! Trilinear hexahedral interpolation of SSP data in 3D
     ! assumes a rectilinear case (not the most general hexahedral)
@@ -545,6 +488,7 @@ END SUBROUTINE EvaluateSSP2D
     INTEGER,            PARAMETER     :: SSPFile = 40
     REAL      (KIND=8), INTENT( IN  ) :: freq
     REAL      (KIND=8), INTENT( IN  ) :: x( 3 )   ! x-y-z coordinate where sound speed is evaluated
+    REAL      (KIND=8), INTENT( IN  ) :: t( 3 )   ! ray tangent; for edge cases of updating segments
     CHARACTER (LEN =3), INTENT( IN  ) :: Task
     REAL      (KIND=8), INTENT( OUT ) :: c, cimag, gradc( 3 ), cxx, cyy, czz, cxy, cxz, cyz, rho ! sound speed and its derivatives
     INTEGER                           :: AllocateStatus, iSegxt, iSegyt, iy2, iz2, iSegxTT( 1 ), iSegyTT( 1 ), iSegzTT( 1 )
@@ -775,9 +719,10 @@ END SUBROUTINE EvaluateSSP2D
 
 !**********************************************************************!
 
-  SUBROUTINE Analytic( x, c, cimag, gradc, crr, crz, czz, rho )
+  SUBROUTINE Analytic( x, t, c, cimag, gradc, crr, crz, czz, rho )
 
     REAL (KIND=8), INTENT( IN  ) :: x( 2 )
+    REAL (KIND=8), INTENT( IN  ) :: t( 2 )   ! ray tangent; for edge cases of updating segments
     REAL (KIND=8), INTENT( OUT ) :: c, cimag, gradc( 2 ), crr, crz, czz, rho
     REAL (KIND=8)                :: c0, cr, cz, DxtDz, xt
 
@@ -812,9 +757,10 @@ END SUBROUTINE EvaluateSSP2D
 
   !**********************************************************************!
 
-  SUBROUTINE AnalyticCosh( x, c, cimag, gradc, crr, crz, czz, rho )
+  SUBROUTINE AnalyticCosh( x, t, c, cimag, gradc, crr, crz, czz, rho )
 
     REAL (KIND=8), INTENT( IN  ) :: x( 2 )
+    REAL (KIND=8), INTENT( IN  ) :: t( 2 )   ! ray tangent; for edge cases of updating segments
     REAL (KIND=8), INTENT( OUT ) :: c, cimag, gradc( 2 ), crr, crz, czz, rho
     REAL (KIND=8)                :: cr, cz, A, B, D, z
 
@@ -844,9 +790,10 @@ END SUBROUTINE EvaluateSSP2D
 
 !**********************************************************************!
 
-SUBROUTINE Analytic3D( x, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho )
+SUBROUTINE Analytic3D( x, t, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho )
 
   REAL (KIND=8) :: x( 3 ), c, cimag, gradc( 3 ), cxx, cyy, czz, cxy, cxz, cyz, c0, W, Wz, epsilon, epsilon_y
+  REAL (KIND=8), INTENT( IN  ) :: t( 3 )   ! ray tangent; for edge cases of updating segments
   REAL (KIND=8) :: rho
   
   iSegz = 1
@@ -939,6 +886,60 @@ END SUBROUTINE Analytic3D
     CALL ERROUT( 'ReadSSP', 'Number of SSP points exceeds limit' )
 
   END SUBROUTINE ReadSSP
+  
+  SUBROUTINE UpdateDepthSegmentT( x, t )
+     REAL (KIND=8), INTENT(IN) :: x( 2 ), t( 2 )
+     
+     ! LP: Handles edge cases based on which direction the ray is going. If the
+     ! ray takes a small step in the direction of t, it will remain in the same
+     ! segment as it is now.
+     
+     IF ( t( 2 ) >= 0.0 ) THEN
+        ! SSP%z( iSegz ) <= x( 2 ) < SSP%z( iSegz + 1 )
+        DO WHILE ( x( 2 ) < SSP%z( iSegz ) .AND. iSegz > 1 )
+           iSegz = iSegz - 1
+        END DO
+        DO WHILE ( x( 2 ) >= SSP%z( iSegz + 1 ) .AND. iSegz < SSP%Npts-1 )
+           iSegz = iSegz + 1
+        END DO
+     ELSE
+        ! SSP%z( iSegz ) < x( 2 ) <= SSP%z( iSegz + 1 )
+        DO WHILE ( x( 2 ) > SSP%z( iSegz + 1 ) .AND. iSegz < SSP%Npts-1 )
+           iSegz = iSegz + 1
+        END DO
+        DO WHILE ( x( 2 ) <= SSP%z( iSegz ) .AND. iSegz > 1 )
+           iSegz = iSegz - 1
+        END DO
+     ENDIF
+     
+  END SUBROUTINE
+
+  SUBROUTINE UpdateRangeSegmentT( x, t )
+     REAL (KIND=8), INTENT(IN) :: x( 2 ), t( 2 )
+     
+     ! LP: Handles edge cases based on which direction the ray is going. If the
+     ! ray takes a small step in the direction of t, it will remain in the same
+     ! segment as it is now.
+     
+     IF ( t( 1 ) >= 0.0 ) THEN
+        ! SSP%z( iSegr ) <= x( 1 ) < SSP%z( iSegr + 1 )
+        DO WHILE ( x( 1 ) < SSP%Seg%r( iSegr ) .AND. iSegr > 1 )
+           iSegr = iSegr - 1
+        END DO
+        DO WHILE ( x( 1 ) >= SSP%Seg%r( iSegr + 1 ) .AND. iSegr < SSP%Nr-1 )
+           iSegr = iSegr + 1
+        END DO
+     ELSE
+        ! SSP%z( iSegr ) < x( 1 ) <= SSP%z( iSegr + 1 )
+        DO WHILE ( x( 1 ) > SSP%Seg%r( iSegr + 1 ) .AND. iSegr < SSP%Nr-1 )
+           iSegr = iSegr + 1
+        END DO
+        DO WHILE ( x( 1 ) <= SSP%Seg%r( iSegr ) .AND. iSegr > 1 )
+           iSegr = iSegr - 1
+        END DO
+     ENDIF
+     
+  END SUBROUTINE
 
 END MODULE sspmod
  
