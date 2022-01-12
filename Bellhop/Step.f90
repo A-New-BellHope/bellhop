@@ -4,7 +4,7 @@ MODULE Step
   USE sspMod
   IMPLICIT NONE
   
-  REAL (KIND=8), PARAMETER, PRIVATE :: REL_SNAP = 1.0d-6 ! Relative error/distance from a boundary to snap to it
+  REAL (KIND=8), PARAMETER, PRIVATE :: INFINITESIMAL_STEP_SIZE = 1.0d-6
 CONTAINS
 
   SUBROUTINE Step2D( ray0, ray2, Topx, Topn, Botx, Botn )
@@ -22,7 +22,9 @@ CONTAINS
          c0, cimag0, crr0, crz0, czz0, csq0, cnn0_csq0, &
          c1, cimag1, crr1, crz1, czz1, csq1, cnn1_csq1, &
          c2, cimag2, crr2, crz2, czz2, urayt0( 2 ), urayt1( 2 ), &
-         h, halfh, hw0, hw1, ray2n( 2 ), RM, RN, gradcjump( 2 ), cnjump, csjump, w0, w1, rho 
+         h, halfh, ray2n( 2 ), RM, RN, gradcjump( 2 ), cnjump, csjump, w0, w1, rho 
+    REAL (KIND=8 ) :: urayt2( 2 ), unitdt( 2 ), unitdp( 2 ), unitdq( 2 )
+    COMPLEX (KIND=8 ) :: unitdtau
          
     WRITE( PRTFile, * )
     WRITE( PRTFile, * ) 'ray0 x t p q', ray0%x, ray0%t, ray0%p, ray0%q
@@ -78,16 +80,21 @@ CONTAINS
     ! use blend of f' based on proportion of a full step used.
     w1  = h / ( 2.0d0 * halfh )
     w0  = 1.0d0 - w1
-    hw0 = h * w0
-    hw1 = h * w1
-    
-    ! WRITE( PRTFile, * ) 'w1 w0 hw0 hw1', w1, w0, hw0, hw1
+    WRITE( PRTFile, * ) 'w1 w0', w1, w0
+    urayt2   =  w0 * urayt0                      + w1 * urayt1
+    unitdt   = -w0 * gradc0 / csq0               - w1 * gradc1 / csq1
+    unitdp   = -w0 * cnn0_csq0 * ray0%q          - w1 * cnn1_csq1 * ray1%q
+    unitdq   =  w0 * c0        * ray0%p          + w1 * c1        * ray1%p
+    unitdtau =  w0 / CMPLX( c0, cimag0, KIND=8 ) + w1 / CMPLX( c1, cimag1, KIND=8 )
 
-    ray2%x   = ray0%x   + hw0 * urayt0              + hw1 * urayt1
-    ray2%t   = ray0%t   - hw0 * gradc0 / csq0       - hw1 * gradc1 / csq1
-    ray2%p   = ray0%p   - hw0 * cnn0_csq0 * ray0%q  - hw1 * cnn1_csq1 * ray1%q
-    ray2%q   = ray0%q   + hw0 * c0        * ray0%p  + hw1 * c1        * ray1%p
-    ray2%tau = ray0%tau + hw0 / CMPLX( c0, cimag0, KIND=8 ) + hw1 / CMPLX( c1, cimag1, KIND=8 )
+    ! Take the blended ray tangent (urayt2) and find the minimum step size (h)
+    ! to put this on a boundary, and ensure that the resulting position
+    ! (ray2.x) gets put precisely on the boundary.
+    CALL StepToBdry2D(ray0%x, ray2%x, urayt2, h, iSegz0, iSegr0, Topx, Topn, Botx, Botn)
+    ray2%t   = ray0%t   + h * unitdt
+    ray2%p   = ray0%p   + h * unitdp
+    ray2%q   = ray0%q   + h * unitdq
+    ray2%tau = ray0%tau + h * unitdtau
 
     WRITE( PRTFile, * ) 'ray2 x t p q tau', ray2%x, ray2%t, ray2%p, ray2%q, ray2%tau
 
@@ -95,53 +102,6 @@ CONTAINS
     ray2%Phase     = ray0%Phase
     ray2%NumTopBnc = ray0%NumTopBnc
     ray2%NumBotBnc = ray0%NumBotBnc
-    
-    ! ReduceStep2D aims to put the position exactly on an interface. However,
-    ! since it is not modifying the position directly, but computing a step
-    ! size which is then used to modify the position, rounding errors may cause
-    ! the final position to be slightly before or after the interface. If
-    ! before, the next (very small) step takes the ray over the interface; if
-    ! after, no extra small step is needed. Since rounding errors are
-    ! effectively random, the resulting trajectory receives or doesn't receive
-    ! an extra step randomly. While the extra step is very small, it slightly
-    ! changes all the values after it, potentially leading to divergence later.
-    ! So, if there is an interface very close, snap to it.
-    IF ( ABS( urayt0( 2 ) ) > EPSILON( urayt0( 2 ) ) .OR. ABS( urayt1( 2 ) ) > EPSILON( urayt1( 2 ) ) ) THEN
-       ! Ray has some depth movement component
-       CALL StepSnapTo( ray2%x( 2 ), SSP%z( iSegz0     ) )
-       CALL StepSnapTo( ray2%x( 2 ), SSP%z( iSegz0 + 1 ) )
-    END IF
-    IF ( ABS( DOT_PRODUCT( Topn, ray2%x - Topx )) < REL_SNAP ) THEN
-       ! On the top surface. If the top surface is slanted, doing a correction
-       ! here won't necessarily be any more accurate than the original
-       ! computation. But if it's flat, like usually, we want the exact top
-       ! depth value.
-       IF ( ABS( Topn( 1 ) ) < EPSILON( Topn( 1 ) ) ) THEN
-          ray2%x( 2 ) = Topx( 2 )
-          WRITE( PRTFile, * ) 'Snapped at top', ray2%x
-       END IF
-    END IF
-    IF ( ABS( DOT_PRODUCT( Botn, ray2%x - Botx )) < REL_SNAP ) THEN
-       ! On the bottom surface. If the bottom surface is slanted, doing a
-       ! correction here won't necessarily be any more accurate than the
-       ! original computation. But if it's flat, like usually, we want the
-       ! exact bottom depth value.
-       IF ( ABS( Botn( 1 ) ) < EPSILON( Botn( 1 ) ) ) THEN
-          ray2%x( 2 ) = Topx( 2 )
-          WRITE( PRTFile, * ) 'Snapped at bottom', ray2%x
-       END IF
-    END IF
-    IF ( ABS( urayt0( 1 ) ) > EPSILON( urayt0( 1 ) ) .OR. ABS( urayt1( 1 ) ) > EPSILON( urayt1( 1 ) ) ) THEN
-       ! Ray has some range movement component
-       CALL StepSnapTo( ray2%x( 1 ), rTopSeg( 1 ) ) ! top seg minimum
-       CALL StepSnapTo( ray2%x( 1 ), rTopSeg( 2 ) ) ! top seg maximum
-       CALL StepSnapTo( ray2%x( 1 ), rBotSeg( 1 ) ) ! bot seg minimum
-       CALL StepSnapTo( ray2%x( 1 ), rBotSeg( 2 ) ) ! bot seg maximum
-       IF ( SSP%Type == 'Q' ) THEN
-          CALL StepSnapTo( ray2%x( 1 ), SSP%Seg%r( iSegz0     ) )
-          CALL StepSnapTo( ray2%x( 1 ), SSP%Seg%r( iSegz0 + 1 ) )
-       END IF
-    END IF
 
     ! If we crossed an interface, apply jump condition
 
@@ -232,8 +192,8 @@ CONTAINS
     END IF
 
     h = MIN( h, h1, h2, h3, h4 )           ! take limit set by shortest distance to a crossing
-    IF ( h < 1.0d-4 * Beam%deltas ) THEN   ! is it taking an infinitesimal step?
-       h = 1.0d-5 * Beam%deltas            ! make sure we make some motion
+    IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN   ! is it taking an infinitesimal step?
+       h = INFINITESIMAL_STEP_SIZE * Beam%deltas            ! make sure we make some motion
        iSmallStepCtr = iSmallStepCtr + 1   ! keep a count of the number of sequential small steps
     ELSE
        iSmallStepCtr = 0   ! didn't do a small step so reset the counter
@@ -243,15 +203,88 @@ CONTAINS
   
   ! **********************************************************************!
   
-  SUBROUTINE StepSnapTo( x, tgt )
-    REAL (KIND=8), INTENT( INOUT ) :: x
-    REAL (KIND=8), INTENT( IN    ) :: tgt
+  SUBROUTINE StepToBdry2D( x0, x2, urayt, h, iSegz0, iSegr0, Topx, Topn, Botx, Botn )
+    USE BdryMod
+    REAL (KIND=8), INTENT( IN    ) :: x0( 2 ), urayt( 2 )
+    REAL (KIND=8), INTENT( INOUT ) :: x2( 2 ), h
+    INTEGER,       INTENT( IN    ) :: iSegz0, iSegr0                             ! SSP layer the ray is in
+    REAL (KIND=8), INTENT( IN    ) :: Topx( 2 ), Topn( 2 ), Botx( 2 ), Botn( 2 ) ! Top, bottom coordinate and normal
+    REAL (KIND=8)                  :: d( 2 ), d0( 2 ), rSeg( 2 )
     
-    IF ( ABS( ( x - tgt ) / x ) < REL_SNAP ) THEN
-       WRITE( PRTFile, * ) 'Snapping to', tgt
-       x = tgt
+    ! Original step due to maximum step size
+    h = Beam%deltas
+    x2 = x0 + h * urayt
+    
+    ! interface crossing in depth
+    IF ( ABS( urayt( 2 ) ) > EPSILON( h ) ) THEN
+       IF      ( SSP%z( iSegz0     ) > x2( 2 ) ) THEN
+          h  = ( SSP%z( iSegz0     ) - x0( 2 ) ) / urayt( 2 )
+          x2( 1 ) = x0( 1 ) + h * urayt( 1 )
+          x2( 2 ) = SSP%z( iSegz0 )
+          WRITE( PRTFile, * ) 'StepToBdry2D lower depth h to', h, x2
+       ELSE IF ( SSP%z( iSegz0 + 1 ) < x2( 2 ) ) THEN
+          h  = ( SSP%z( iSegz0 + 1 ) - x0( 2 ) ) / urayt( 2 )
+          x2( 1 ) = x0( 1 ) + h * urayt( 1 )
+          x2( 2 ) = SSP%z( iSegz0 + 1 )
+          WRITE( PRTFile, * ) 'StepToBdry2D upper depth h to', h, x2
+       END IF
+    END IF
+
+    ! top crossing
+    d = x2 - Topx             ! vector from top to ray
+    IF ( DOT_PRODUCT( Topn, d ) > EPSILON( h ) ) THEN
+       d0 = x0 - Topx         ! vector from top node to ray origin
+       h = -DOT_PRODUCT( d0, Topn ) / DOT_PRODUCT( urayt, Topn )
+       x2 = x0 + h * urayt
+       ! Snap to exact top depth value if it's flat
+       IF ( ABS( Topn( 1 ) ) < EPSILON( Topn( 1 ) ) ) THEN
+          x2( 2 ) = Topx( 2 )
+       END IF
+       WRITE( PRTFile, * ) 'StepToBdry2D top crossing h to', h, x2
+    END IF
+
+    ! bottom crossing
+    d = x2 - Botx              ! vector from bottom to ray
+    IF ( DOT_PRODUCT( Botn, d ) > EPSILON( h ) ) THEN
+       d0  = x0 - Botx         ! vector from bottom node to ray origin
+       h = -DOT_PRODUCT( d0, Botn ) / DOT_PRODUCT( urayt, Botn )
+       x2 = x0 + h * urayt
+       ! Snap to exact bottom depth value if it's flat
+       IF ( ABS( Botn( 1 ) ) < EPSILON( Botn( 1 ) ) ) THEN
+          x2( 2 ) = Botx( 2 )
+       END IF
+       WRITE( PRTFile, * ) 'StepToBdry2D bottom crossing h to', h, x2
+    END IF
+
+    ! top or bottom segment crossing in range
+    rSeg( 1 ) = MAX( rTopSeg( 1 ), rBotSeg( 1 ) ) ! lower range bound (not an x value)
+    rSeg( 2 ) = MIN( rTopSeg( 2 ), rBotSeg( 2 ) ) ! upper range bound (not a y value)
+
+    IF ( SSP%Type == 'Q' ) THEN
+       rSeg( 1 ) = MAX( rSeg( 1 ), SSP%Seg%r( iSegr0     ) )
+       rSeg( 2 ) = MIN( rSeg( 2 ), SSP%Seg%r( iSegr0 + 1 ) )
+    END IF
+
+    IF ( ABS( urayt( 1 ) )  > EPSILON( h ) ) THEN
+       IF      ( x2( 1 ) < rSeg( 1 ) ) THEN
+          h = -( x0( 1 ) - rSeg( 1 ) ) / urayt( 1 )
+          x2( 1 ) = rSeg( 1 )
+          x2( 2 ) = x0( 2 ) + h * urayt( 2 )
+          WRITE( PRTFile, * ) 'StepToBdry2D lower range h to', h, x2
+       ELSE IF ( x2( 1 ) > rSeg( 2 ) ) THEN
+          h = -( x0( 1 ) - rSeg( 2 ) ) / urayt( 1 )
+          x2( 1 ) = rSeg( 2 )
+          x2( 2 ) = x0( 2 ) + h * urayt( 2 )
+          WRITE( PRTFile, * ) 'StepToBdry2D upper range h to', h, x2
+       END IF
+    END IF
+
+    IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN   ! is it taking an infinitesimal step?
+       h = INFINITESIMAL_STEP_SIZE * Beam%deltas            ! make sure we make some motion
+       x2 = x0 + h * urayt
+       WRITE( PRTFile, * ) 'StepToBdry2D small step forced h to', h, x2
     END IF
     
-  END SUBROUTINE StepSnapTo
+  END SUBROUTINE StepToBdry2D
 
 END MODULE Step
