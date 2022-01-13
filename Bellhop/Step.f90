@@ -7,7 +7,7 @@ MODULE Step
   REAL (KIND=8), PARAMETER, PRIVATE :: INFINITESIMAL_STEP_SIZE = 1.0d-6
 CONTAINS
 
-  SUBROUTINE Step2D( ray0, ray2, Topx, Topn, Botx, Botn )
+  SUBROUTINE Step2D( ray0, ray2, topRefl, botRefl, Topx, Topn, Botx, Botn )
 
     ! Does a single step along the ray
     ! x denotes the ray coordinate, (r,z)
@@ -17,6 +17,7 @@ CONTAINS
     USE BdryMod
     TYPE( ray2DPt )    :: ray0, ray1, ray2
     REAL (KIND=8 ), INTENT( IN ) :: Topx( 2 ), Topn( 2 ), Botx( 2 ), Botn( 2 )
+    LOGICAL, INTENT( OUT ) :: topRefl, botRefl
     INTEGER            :: iSegz0, iSegr0
     REAL     (KIND=8 ) :: gradc0( 2 ), gradc1( 2 ), gradc2( 2 ), &
          c0, cimag0, crr0, crz0, czz0, csq0, cnn0_csq0, &
@@ -26,13 +27,13 @@ CONTAINS
     REAL (KIND=8 ) :: urayt2( 2 ), unitdt( 2 ), unitdp( 2 ), unitdq( 2 )
     COMPLEX (KIND=8 ) :: unitdtau
          
-    WRITE( PRTFile, * )
-    WRITE( PRTFile, * ) 'ray0 x t p q', ray0%x, ray0%t, ray0%p, ray0%q
+    ! WRITE( PRTFile, * )
+    ! WRITE( PRTFile, * ) 'ray0 x t p q', ray0%x, ray0%t, ray0%p, ray0%q
     ! WRITE( PRTFile, * ) 'iSegz iSegr', iSegz, iSegr
     
-    IF ( ray0%x( 1 ) > 420.0 ) THEN
-       STOP 'Enough'
-    END IF
+    ! IF ( ray0%x( 1 ) > 420.0 ) THEN
+    !    STOP 'Enough'
+    ! END IF
 
     ! The numerical integrator used here is a version of the polygon (a.k.a. midpoint, leapfrog, or Box method), and similar
     ! to the Heun (second order Runge-Kutta method).
@@ -80,7 +81,7 @@ CONTAINS
     ! use blend of f' based on proportion of a full step used.
     w1  = h / ( 2.0d0 * halfh )
     w0  = 1.0d0 - w1
-    WRITE( PRTFile, * ) 'w1 w0', w1, w0
+    ! WRITE( PRTFile, * ) 'w1 w0', w1, w0
     urayt2   =  w0 * urayt0                      + w1 * urayt1
     unitdt   = -w0 * gradc0 / csq0               - w1 * gradc1 / csq1
     unitdp   = -w0 * cnn0_csq0 * ray0%q          - w1 * cnn1_csq1 * ray1%q
@@ -90,13 +91,14 @@ CONTAINS
     ! Take the blended ray tangent (urayt2) and find the minimum step size (h)
     ! to put this on a boundary, and ensure that the resulting position
     ! (ray2.x) gets put precisely on the boundary.
-    CALL StepToBdry2D(ray0%x, ray2%x, urayt2, h, iSegz0, iSegr0, Topx, Topn, Botx, Botn)
+    CALL StepToBdry2D(ray0%x, ray2%x, urayt2, h, topRefl, botRefl, &
+       iSegz0, iSegr0, Topx, Topn, Botx, Botn)
     ray2%t   = ray0%t   + h * unitdt
     ray2%p   = ray0%p   + h * unitdp
     ray2%q   = ray0%q   + h * unitdq
     ray2%tau = ray0%tau + h * unitdtau
 
-    WRITE( PRTFile, * ) 'ray2 x t p q tau', ray2%x, ray2%t, ray2%p, ray2%q, ray2%tau
+    ! WRITE( PRTFile, * ) 'ray2 x t p q tau', ray2%x, ray2%t, ray2%p, ray2%q, ray2%tau
 
     ray2%Amp       = ray0%Amp
     ray2%Phase     = ray0%Phase
@@ -203,12 +205,14 @@ CONTAINS
   
   ! **********************************************************************!
   
-  SUBROUTINE StepToBdry2D( x0, x2, urayt, h, iSegz0, iSegr0, Topx, Topn, Botx, Botn )
+  SUBROUTINE StepToBdry2D( x0, x2, urayt, h, topRefl, botRefl, &
+       iSegz0, iSegr0, Topx, Topn, Botx, Botn )
     USE BdryMod
     REAL (KIND=8), INTENT( IN    ) :: x0( 2 ), urayt( 2 )
     REAL (KIND=8), INTENT( INOUT ) :: x2( 2 ), h
     INTEGER,       INTENT( IN    ) :: iSegz0, iSegr0                             ! SSP layer the ray is in
     REAL (KIND=8), INTENT( IN    ) :: Topx( 2 ), Topn( 2 ), Botx( 2 ), Botn( 2 ) ! Top, bottom coordinate and normal
+    LOGICAL,       INTENT( OUT   ) :: topRefl, botRefl
     REAL (KIND=8)                  :: d( 2 ), d0( 2 ), rSeg( 2 )
     
     ! Original step due to maximum step size
@@ -221,12 +225,12 @@ CONTAINS
           h  = ( SSP%z( iSegz0     ) - x0( 2 ) ) / urayt( 2 )
           x2( 1 ) = x0( 1 ) + h * urayt( 1 )
           x2( 2 ) = SSP%z( iSegz0 )
-          WRITE( PRTFile, * ) 'StepToBdry2D lower depth h to', h, x2
+          ! WRITE( PRTFile, * ) 'StepToBdry2D lower depth h to', h, x2
        ELSE IF ( SSP%z( iSegz0 + 1 ) < x2( 2 ) ) THEN
           h  = ( SSP%z( iSegz0 + 1 ) - x0( 2 ) ) / urayt( 2 )
           x2( 1 ) = x0( 1 ) + h * urayt( 1 )
           x2( 2 ) = SSP%z( iSegz0 + 1 )
-          WRITE( PRTFile, * ) 'StepToBdry2D upper depth h to', h, x2
+          ! WRITE( PRTFile, * ) 'StepToBdry2D upper depth h to', h, x2
        END IF
     END IF
 
@@ -240,7 +244,10 @@ CONTAINS
        IF ( ABS( Topn( 1 ) ) < EPSILON( Topn( 1 ) ) ) THEN
           x2( 2 ) = Topx( 2 )
        END IF
-       WRITE( PRTFile, * ) 'StepToBdry2D top crossing h to', h, x2
+       ! WRITE( PRTFile, * ) 'StepToBdry2D top crossing h to', h, x2
+       topRefl = .TRUE.
+    ELSE
+       topRefl = .FALSE.
     END IF
 
     ! bottom crossing
@@ -253,7 +260,13 @@ CONTAINS
        IF ( ABS( Botn( 1 ) ) < EPSILON( Botn( 1 ) ) ) THEN
           x2( 2 ) = Botx( 2 )
        END IF
-       WRITE( PRTFile, * ) 'StepToBdry2D bottom crossing h to', h, x2
+       ! WRITE( PRTFile, * ) 'StepToBdry2D bottom crossing h to', h, x2
+       botRefl = .TRUE.
+       ! Should not ever be able to cross both, but in case it does, make sure
+       ! only the crossing we exactly landed on is active
+       topRefl = .FALSE.
+    ELSE
+       botRefl = .FALSE.
     END IF
 
     ! top or bottom segment crossing in range
@@ -270,19 +283,37 @@ CONTAINS
           h = -( x0( 1 ) - rSeg( 1 ) ) / urayt( 1 )
           x2( 1 ) = rSeg( 1 )
           x2( 2 ) = x0( 2 ) + h * urayt( 2 )
-          WRITE( PRTFile, * ) 'StepToBdry2D lower range h to', h, x2
+          ! WRITE( PRTFile, * ) 'StepToBdry2D lower range h to', h, x2
+          topRefl = .FALSE.
+          botRefl = .FALSE.
        ELSE IF ( x2( 1 ) > rSeg( 2 ) ) THEN
           h = -( x0( 1 ) - rSeg( 2 ) ) / urayt( 1 )
           x2( 1 ) = rSeg( 2 )
           x2( 2 ) = x0( 2 ) + h * urayt( 2 )
-          WRITE( PRTFile, * ) 'StepToBdry2D upper range h to', h, x2
+          ! WRITE( PRTFile, * ) 'StepToBdry2D upper range h to', h, x2
+          topRefl = .FALSE.
+          botRefl = .FALSE.
        END IF
     END IF
 
     IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN   ! is it taking an infinitesimal step?
        h = INFINITESIMAL_STEP_SIZE * Beam%deltas            ! make sure we make some motion
        x2 = x0 + h * urayt
-       WRITE( PRTFile, * ) 'StepToBdry2D small step forced h to', h, x2
+       ! WRITE( PRTFile, * ) 'StepToBdry2D small step forced h to', h, x2
+       ! Recheck reflection conditions
+       d = x2 - Topx             ! vector from top to ray
+       IF ( DOT_PRODUCT( Topn, d ) > EPSILON( h ) ) THEN
+          topRefl = .TRUE.
+       ELSE
+          topRefl = .FALSE.
+       END IF
+       d = x2 - Botx              ! vector from bottom to ray
+       IF ( DOT_PRODUCT( Botn, d ) > EPSILON( h ) ) THEN
+          botRefl = .TRUE.
+          topRefl = .FALSE.
+       ELSE
+          botRefl = .FALSE.
+       END IF
     END IF
     
   END SUBROUTINE StepToBdry2D

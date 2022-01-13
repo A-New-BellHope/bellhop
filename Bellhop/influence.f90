@@ -570,8 +570,11 @@ CONTAINS
 
        ! compute beam influence for this segment of the ray
        RcvrRanges: DO
+          ! WRITE( PRTFile, * ) 'iS', iS-2, 'ir', ir-1
+          
           ! is Rr( ir ) contained in [ rA, rB )? Then compute beam influence
           IF ( Pos%Rr( ir ) >= MIN( rA, rB ) .AND. Pos%Rr( ir ) < MAX( rA, rB ) ) THEN
+             ! WRITE( PRTFile, * ) '  rA', rA, 'rB', rB
 
              RcvrDepths: DO iz = 1, NRz_per_range
                 IF ( Beam%RunType( 5 : 5 ) == 'I' ) THEN

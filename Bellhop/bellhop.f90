@@ -441,6 +441,7 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
   REAL     (KIND=8) :: DistBegTop, DistEndTop, DistBegBot, DistEndBot ! Distances from ray beginning, end to top and bottom
   REAL     (KIND=8) :: sss
   REAL     (KIND=8) :: tinit( 2 )
+  LOGICAL           :: topRefl, botRefl
 
   ! Initial conditions
   
@@ -502,6 +503,7 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
      is1 = is + 1
 
      CALL Step2D( ray2D( is ), ray2D( is1 ),  &
+          topRefl, botRefl, &
           Top( IsegTop )%x, Top( IsegTop )%n, &
           Bot( IsegBot )%x, Bot( IsegBot )%n )
 
@@ -540,8 +542,8 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
      CALL Distances2D( ray2D( is1 )%x, Top( IsegTop )%x, Bot( IsegBot )%x, dEndTop,    dEndBot,  &
           Top( IsegTop )%n, Bot( IsegBot )%n, DistEndTop, DistEndBot )
 
-     IF      ( DistBegTop > 0.0d0 .AND. DistEndTop <= 0.0d0 ) THEN  ! test top reflection
-
+     IF      ( topRefl ) THEN
+        ! WRITE( PRTFile, * ) 'Top reflecting'
         IF ( atiType == 'C' ) THEN
            sss     = DOT_PRODUCT( dEndTop, Top( IsegTop )%t ) / Top( IsegTop )%Len   ! proportional distance along segment
            TopnInt = ( 1 - sss ) * Top( IsegTop )%Noden + sss * Top( 1 + IsegTop )%Noden
@@ -557,8 +559,8 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
         CALL Distances2D( ray2D( is + 1 )%x, Top( IsegTop )%x, Bot( IsegBot )%x, dEndTop,    dEndBot,  &
              Top( IsegTop )%n, Bot( IsegBot )%n, DistEndTop, DistEndBot )
 
-     ELSE IF ( DistBegBot > 0.0d0 .AND. DistEndBot <= 0.0d0 ) THEN  ! test bottom reflection
-
+     ELSE IF ( botRefl ) THEN
+        ! WRITE( PRTFile, * ) 'Bottom reflecting'
         IF ( btyType == 'C' ) THEN
            sss     = DOT_PRODUCT( dEndBot, Bot( IsegBot )%t ) / Bot( IsegBot )%Len   ! proportional distance along segment
            BotnInt = ( 1 - sss ) * Bot( IsegBot )%Noden + sss * Bot( 1 + IsegBot )%Noden
