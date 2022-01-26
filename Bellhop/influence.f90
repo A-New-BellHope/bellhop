@@ -139,6 +139,7 @@ CONTAINS
                       contri = ABS( contri ) ** 2
                    END SELECT
 
+                   ! WRITE( PRTFile, * ) 'iz ir is contri', iz-1, ir-1, is-2, contri
                    U( iz, ir ) = U( iz, ir ) + CMPLX( Hermite( n, RadiusMax, 2 * RadiusMax ) * contri )
                 END IF
              END DO RcvrRanges
@@ -560,7 +561,10 @@ CONTAINS
        RadiusMax = BeamWindow * sigma
 
        ! depth limits of beam
-       IF ( ABS( rayt( 1 ) ) > 0.5 ) THEN   ! shallow angle ray
+       ! LP: For rays shot at exactly 60 degrees, they will hit this edge case.
+       ! This is a sharp edge--the handling on each side of this edge may be
+       ! significantly different. So, moved the edge away from the round number.
+       IF ( ABS( rayt( 1 ) ) > 0.50001 ) THEN   ! shallow angle ray
           zmin   = min( ray2D( iS - 1 )%x( 2 ), ray2D( iS )%x( 2 ) ) - RadiusMax
           zmax   = max( ray2D( iS - 1 )%x( 2 ), ray2D( iS )%x( 2 ) ) + RadiusMax
        ELSE                                 ! steep angle ray
@@ -591,6 +595,9 @@ CONTAINS
                 sigma  = MAX( sigma, MIN( 0.2 * freq * REAL( ray2D( iS )%tau ), pi * lambda ) )  ! min pi * lambda, unless near
 
                 IF ( n < BeamWindow * sigma ) THEN   ! Within beam window?
+                   ! IF ( ir-1 >= 0 .AND. ir-1 <= 2 ) THEN
+                   !    WRITE( PRTFile, * ) '    iz n sigma', iz-1, n, sigma
+                   ! END IF
                    A        = ABS( q0 / q )
                    delay    = ray2D( iS - 1 )%tau + s * dtauds     ! interpolated delay
                    const    = Ratio1 * SQRT( ray2D( iS )%c / ABS( q ) ) * ray2D( iS )%Amp

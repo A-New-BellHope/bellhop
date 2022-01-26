@@ -144,6 +144,11 @@ CONTAINS
 
     REAL (KIND=8) :: f, Franc_Garr
     REAL (KIND=8) :: c, A1, A2, A3, P1, P2, P3, f1, f2
+    ! LP: Bug (at least technically): Single-precision and double-precision
+    ! literals are all mixed together here, both including values which are
+    ! not representable as floats, thus leading to different results.
+    ! Practically, these are approximate, experimentally-derived constants, so
+    ! errors at the 1e-7 scale are completely not meaningful.
 
     c = 1412 + 3.21 * T + 1.19 * Salinity + 0.0167 * z_bar
 

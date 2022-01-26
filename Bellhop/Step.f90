@@ -28,7 +28,7 @@ CONTAINS
     COMPLEX (KIND=8 ) :: unitdtau
          
     ! WRITE( PRTFile, * )
-    ! WRITE( PRTFile, * ) 'ray0 x t p q', ray0%x, ray0%t, ray0%p, ray0%q
+    ! WRITE( PRTFile, * ) 'ray0 x t p q tau amp', ray0%x, ray0%t, ray0%p, ray0%q, ray0%tau, ray0%Amp
     ! WRITE( PRTFile, * ) 'iSegz iSegr', iSegz, iSegr
     
     ! IF ( ray0%x( 1 ) > 420.0 ) THEN
@@ -52,6 +52,7 @@ CONTAINS
     urayt0 = c0 * ray0%t  ! unit tangent
 
     CALL ReduceStep2D( ray0%x, urayt0, iSegz0, iSegr0, Topx, Topn, Botx, Botn, h ) ! reduce h to land on boundary
+    ! WRITE( PRTFile, * ) 'out h, urayt0', h, urayt0
     halfh = 0.5 * h   ! first step of the modified polygon method is a half step
 
     ray1%x = ray0%x + halfh * urayt0
