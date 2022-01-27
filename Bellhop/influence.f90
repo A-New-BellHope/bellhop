@@ -25,7 +25,7 @@ CONTAINS
     COMPLEX,          INTENT( INOUT ) :: U( NRz_per_range, Pos%NRr )  ! complex pressure field
     COMPLEX (KIND=8), INTENT( IN    ) :: epsilon
     INTEGER          :: ir1, ir2, KMAHV( MaxN ), KMAH, image
-    REAL    (KIND=8) :: nA, nB, nSq, c, zr
+    REAL    (KIND=8) :: nA, nB, nSq, c, zr, Polarity
     REAL    (KIND=8) :: znV( Beam%Nsteps ), rnV( Beam%Nsteps )   ! ray normal
     COMPLEX (KIND=8) :: pVB( MaxN ), qVB( MaxN ), q, epsV( MaxN ), contri, gammaV( MaxN ), gamma, P_n, P_s
     COMPLEX (KIND=8) :: tau
@@ -64,6 +64,12 @@ CONTAINS
        zR = Pos%Rz( iz )
 
        Images: DO image = 1, Beam%Nimage
+         
+          ! LP: Previous code did rnV = -rnV for image 2 and 3. When Nimage = 2,
+          ! this means rnV changes sign every step, which can't possibly be
+          ! correct. This was fixed by mbp in InfluenceCervenyCart.
+          Polarity = 1.0D0
+          IF ( image == 2 ) Polarity = -1.0D0
 
           !!! This logic means that the first step along the ray is skipped
           !!! which is a problem if deltas is very large, e.g. isospeed problems
@@ -80,14 +86,15 @@ CONTAINS
              CASE ( 1 )                ! True beam
                 nB  = ( zR -                             ray2D( iS )%x( 2 )   ) / znV( iS )
              CASE ( 2 )                ! Surface-reflected beam
-                rnV = -rnV
                 nB  = ( zR - ( 2.0 * Bdry%Top%HS%Depth - ray2D( iS )%x( 2 ) ) ) / znV( iS )
              CASE ( 3 )                ! Bottom-reflected beam
-                rnV = -rnV
                 nB  = ( zR - ( 2.0 * Bdry%Bot%HS%Depth - ray2D( iS )%x( 2 ) ) ) / znV( iS )
+             CASE DEFAULT
+                WRITE( PRTFile, * ) 'Beam%Nimage = ', Beam%Nimage
+                CALL ERROUT( 'InfluenceCervenyRayCen', 'Nimage must be 1, 2, or 3' )
              END SELECT
 
-             rB  = ray2D( iS )%x( 1 ) + nB * rnV( iS )
+             rB  = ray2D( iS )%x( 1 ) + nB * rnV( iS ) * Polarity
              !!! following assumes uniform space in Pos%r
              ir2 = MAX( MIN( INT( ( rB - Pos%Rr( 1 ) ) / Pos%Delta_r ) + 1, Pos%NRr ), 1 ) ! index of receiver
 
@@ -132,7 +139,7 @@ CONTAINS
                    CALL BranchCut( qVB( iS - 1 ), q, Beam%Type, KMAH ) ! Get correct branch of SQRT
 
                    IF ( KMAH  < 0  ) contri = -contri
-                   IF ( image == 2 ) contri = -contri
+                   contri = Polarity * contri
 
                    SELECT CASE ( Beam%RunType( 1 : 1 ) )
                    CASE ( 'I', 'S' )   ! Incoherent or Semi-coherent TL
