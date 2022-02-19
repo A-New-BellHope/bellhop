@@ -413,7 +413,7 @@ CONTAINS
 
     IF ( x( 1 ) < xBotSeg( 1 ) .OR. x( 1 ) > xBotSeg( 2 ) ) THEN   ! are we outside the segment?
 
-       ! calculate index of bracketting segment
+       ! calculate index of bracketing segment
        IsegBotT = MAXLOC( Bot( :, 1 )%x( 1 ), Bot( :, 1 )%x( 1 ) < x( 1 ) )
 
 !!$       ! The above MAXLOC is concise, but it's unnecessarily testing every segment
@@ -438,7 +438,7 @@ CONTAINS
 !!$          IsegBotT( 1 ) = IsegBotx
 !!$       END IF
 !!$
-!!$       ! if we didn't find a bracketting segment set the segment to 0 indicating a failure
+!!$       ! if we didn't find a bracketing segment set the segment to 0 indicating a failure
 !!$       IsegBotx = IsegBotT( 1 )
 !!$       xBotSeg  = [ Bot( IsegBotx, 1 )%x( 1 ), Bot( IsegBotx + 1, 1 )%x( 1 ) ] 
 !!$       IF ( x( 1 ) < xBotSeg( 1 ) .OR. x( 1 ) > xBotSeg( 2 ) ) IsegBotT( 1 ) = 0

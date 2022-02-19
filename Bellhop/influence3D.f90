@@ -94,7 +94,7 @@ CONTAINS
              ! IF ( irA /= irB .AND. NORM2( ray3D( is )%x - ray3D( is - 1 )%x ) > 1.0D3 * SPACING( ray3D( is )%x( 1 ) ) ) THEN  ! too slow
              IF ( irA /= irB .AND. NORM2( ray3D( is )%x - ray3D( is - 1 )%x ) > 1.0e-4 ) THEN
 
-                ! *** Compute contributions to bracketted receivers ***
+                ! *** Compute contributions to bracketed receivers ***
                 dq_tilde = ray3D( is )%q_tilde - ray3D( is - 1 )%q_tilde
                 dq_hat   = ray3D( is )%q_hat   - ray3D( is - 1 )%q_hat
                 dtau     = ray3D( is )%tau     - ray3D( is - 1 )%tau
@@ -203,7 +203,7 @@ CONTAINS
 
              n_ray_theta = [ -rayt( 2 ), rayt( 1 ), 0.D0 ]  ! normal to the ray in the horizontal receiver plane
 
-             ! *** Compute contributions to bracketted receivers ***
+             ! *** Compute contributions to bracketed receivers ***
              dq_tilde = ray3D( is )%q_tilde - ray3D( is - 1 )%q_tilde
              dq_hat   = ray3D( is )%q_hat   - ray3D( is - 1 )%q_hat
              dtau     = ray3D( is )%tau     - ray3D( is - 1 )%tau
@@ -411,7 +411,7 @@ CONTAINS
                    ! detect and skip duplicate points (happens at boundary reflection)
                    IF ( irA /= irB .AND. NORM2( ray3D( is )%x - ray3D( is - 1 )%x ) > 1.0D3 * SPACING( ray3D( is )%x( 1 ) ) ) THEN
 
-                      ! *** Compute contributions to bracketted receivers ***
+                      ! *** Compute contributions to bracketed receivers ***
                       dq_tilde = ray3D( is )%q_tilde - ray3D( is - 1 )%q_tilde
                       dq_hat   = ray3D( is )%q_hat   - ray3D( is - 1 )%q_hat
                       dtau     = ray3D( is )%tau     - ray3D( is - 1 )%tau
@@ -545,7 +545,7 @@ CONTAINS
 
              n_ray_theta = [ -rayt( 2 ), rayt( 1 ), 0.D0 ]  ! normal to the ray in the horizontal receiver plane
 
-             ! *** Compute contributions to bracketted receivers ***
+             ! *** Compute contributions to bracketed receivers ***
              dq_tilde = ray3D( is )%q_tilde - ray3D( is - 1 )%q_tilde
              dq_hat   = ray3D( is )%q_hat   - ray3D( is - 1 )%q_hat
              dtau     = ray3D( is )%tau     - ray3D( is - 1 )%tau

@@ -34,7 +34,7 @@ CONTAINS
     Nt     = NArr( id, ir )    ! # of arrivals
     NewRay = .TRUE.
 
-    ! Is this the second bracketting ray of a pair?
+    ! Is this the second step of a pair (on the same ray)?
     ! If so, we want to combine the arrivals to conserve space.
     ! (test this by seeing if the arrival time is close to the previous one)
     ! (also need that the phase is about the same to make sure surface and direct paths are not joined)
@@ -45,14 +45,14 @@ CONTAINS
     END IF
 
     IF ( NewRay ) THEN
-       IF ( Nt >= MaxNArr ) THEN       ! space available to add an arrival?
-          iArr = MINLOC( Arr( id, ir, : )%A )                       ! no: replace weakest arrival
+       IF ( Nt >= MaxNArr ) THEN       ! space not available to add an arrival?
+          iArr = MINLOC( Arr( id, ir, : )%A )                       ! replace weakest arrival
           IF ( Amp > Arr( id, ir, iArr( 1 ) )%A ) THEN
              Arr( id, ir, iArr( 1 ) )%A             = SNGL( Amp )       ! amplitude
              Arr( id, ir, iArr( 1 ) )%Phase         = SNGL( Phase )     ! phase
              Arr( id, ir, iArr( 1 ) )%delay         = CMPLX( delay )    ! delay time
-             Arr( id, ir, iArr( 1 ) )%SrcDeclAngle  = SNGL( SrcDeclAngle )  ! angle
-             Arr( id, ir, iArr( 1 ) )%RcvrDeclAngle = SNGL( RcvrDeclAngle ) ! angle
+             Arr( id, ir, iArr( 1 ) )%SrcDeclAngle  = SNGL( SrcDeclAngle )  ! launch angle from source
+             Arr( id, ir, iArr( 1 ) )%RcvrDeclAngle = SNGL( RcvrDeclAngle ) ! angle ray reaches receiver
              Arr( id, ir, iArr( 1 ) )%NTopBnc       = NumTopBnc         ! Number of top     bounces
              Arr( id, ir, iArr( 1 ) )%NBotBnc       = NumBotBnc         !   "       bottom
           ENDIF
@@ -61,8 +61,8 @@ CONTAINS
           Arr(  id, ir, Nt + 1 )%A             = SNGL( Amp )         ! amplitude
           Arr(  id, ir, Nt + 1 )%Phase         = SNGL( Phase )       ! phase
           Arr(  id, ir, Nt + 1 )%delay         = CMPLX( delay )      ! delay time
-          Arr(  id, ir, Nt + 1 )%SrcDeclAngle  = SNGL( SrcDeclAngle )    ! angle
-          Arr(  id, ir, Nt + 1 )%RcvrDeclAngle = SNGL( RcvrDeclAngle )   ! angle
+          Arr(  id, ir, Nt + 1 )%SrcDeclAngle  = SNGL( SrcDeclAngle )    ! launch angle from source
+          Arr(  id, ir, Nt + 1 )%RcvrDeclAngle = SNGL( RcvrDeclAngle )   ! angle ray reaches receiver
           Arr(  id, ir, Nt + 1 )%NTopBnc       = NumTopBnc           ! Number of top     bounces
           Arr(  id, ir, Nt + 1 )%NBotBnc       = NumBotBnc           !   "       bottom
        ENDIF
@@ -198,7 +198,7 @@ CONTAINS
     Nt     = NArr3D( itheta, id, ir )    ! # of arrivals
     NewRay = .TRUE.
 
-    ! Is this the second bracketting ray of a pair?
+    ! Is this the second bracketing ray of a pair?
     ! If so, we want to combine the arrivals to conserve space.
     ! (test this by seeing if the arrival time is close to the previous one)
     ! (also need that the phase is about the same to make sure surface and direct paths are not joined)

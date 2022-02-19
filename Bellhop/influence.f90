@@ -368,7 +368,7 @@ CONTAINS
 
           RcvrDeclAngle = RcvrDeclAngleV( iS )
 
-          ! *** Compute contributions to bracketted receivers ***
+          ! *** Compute contributions to bracketed receivers ***
 
           II = 0
           IF ( irB <= irA ) II = 1   ! going backwards in range
@@ -617,7 +617,7 @@ CONTAINS
              END DO RcvrDepths
           END IF
 
-          ! receiver not bracketted; bump receiver index, ir, towards rB
+          ! receiver not bracketed; bump receiver index, ir, towards rB
           IF ( rB > Pos%Rr( ir ) ) THEN
              IF ( ir >= Pos%NRr        ) EXIT   ! go to next step on ray
              irTT = ir + 1                      ! bump right
@@ -688,7 +688,7 @@ CONTAINS
        IF ( q < 0.0d0 .AND. qOld >= 0.0d0 .OR. q > 0.0d0 .AND. qOld <= 0.0d0 ) phase = phase + pi / 2.
        qold = q
 
-       RcvrRanges: DO WHILE ( ABS( rB - rA ) > 1.0D3 * SPACING( rA ) .AND. rB > Pos%Rr( ir ) )   ! Loop over bracketted receiver ranges
+       RcvrRanges: DO WHILE ( ABS( rB - rA ) > 1.0D3 * SPACING( rA ) .AND. rB > Pos%Rr( ir ) )   ! Loop over bracketed receiver ranges
 
           W     = ( Pos%Rr( ir ) - rA ) / ( rB - rA )
           x     = ray2D( iS - 1 )%x      + W * ( ray2D( iS )%x      - ray2D( iS - 1 )%x )

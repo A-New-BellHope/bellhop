@@ -290,7 +290,7 @@ CONTAINS
        ! averaging two centered differences is equivalent to forming a single centered difference of two steps ...
        DO ii = 2, NPts - 1
           sss = Bdry( ii - 1 )%Len / ( Bdry( ii - 1 )%Len + Bdry( ii )%Len )
-          sss = 0.5
+          sss = 0.5 ! Bug? Line above is overwritten.
           Bdry( ii )%Nodet = ( 1.0 - sss ) * Bdry( ii - 1 )%t + sss * Bdry( ii )%t
        END DO
 

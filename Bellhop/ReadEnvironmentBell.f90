@@ -438,7 +438,7 @@ CONTAINS
 
     ! Handles top and bottom boundary conditions
 
-    REAL     (KIND=8), INTENT( IN    ) :: freq               ! frequency
+    REAL     (KIND=8), INTENT( IN    ) :: freq     ! center / nominal frequency (wideband not supported)
     CHARACTER (LEN=2), INTENT( IN    ) :: AttenUnit
     TYPE( HSInfo ),    INTENT( INOUT ) :: HS
     REAL     (KIND=8) :: Mz, vr, alpha2_f          ! values related to grain size

@@ -147,7 +147,7 @@ CONTAINS
        ! WRITE( PRTFile, * ) 'angle = ', ThetaIntr, 'upper limit = ', R( iRight )%theta
 
     ELSE
-       ! Search for bracketting abscissas: Log2( NPts ) stabs required for a bracket
+       ! Search for bracketing abscissas: Log2( NPts ) stabs required for a bracket
 
        DO WHILE ( iLeft /= iRight - 1 )
           iMid = ( iLeft + iRight ) / 2
@@ -203,7 +203,7 @@ CONTAINS
        iPower = iTab( iRight )
     ELSE
 
-       ! Search for bracketting abscissas:
+       ! Search for bracketing abscissas:
        ! Log base 2 (NPts) stabs required for a bracket
 
        DO WHILE ( iLeft /= iRight-1 )

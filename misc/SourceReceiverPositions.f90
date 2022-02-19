@@ -11,7 +11,7 @@ MODULE SourceReceiverPositions
   INTEGER, PRIVATE            :: IAllocStat     ! used to capture status after allocation
   INTEGER, PRIVATE, PARAMETER :: ENVFile = 5, PRTFile = 6   ! unit 5 is usually (not always) the ENVFile
   INTEGER                     :: Nfreq          ! number of frequencies
-  REAL (KIND=8), ALLOCATABLE  :: freqVec( : )   ! frequency vector for braodband runs
+  REAL (KIND=8), ALLOCATABLE  :: freqVec( : )   ! frequency vector for broadband runs
 
   TYPE Position
      INTEGER              :: NSx = 1, NSy = 1, NSz, NRz, NRr, Ntheta    ! number of x, y, z, r, theta coordinates

@@ -602,7 +602,7 @@ END SUBROUTINE EvaluateSSP2D
        !IF ( x( 1 ) >= SSP%Seg%x( iSegx + 1 ) ) iSegx = MIN( SSP%Nx - 1, iSegx + 1 )   ! bump right
 
        IF ( x( 1 ) < SSP%Seg%x( iSegx ) .OR. x( 1 ) >= SSP%Seg%x( iSegx + 1 ) ) THEN
-!!$          DO iSegxT = 2, SSP%Nx   ! Search for bracketting segment ranges
+!!$          DO iSegxT = 2, SSP%Nx   ! Search for bracketing segment ranges
 !!$             IF ( x( 1 ) < SSP%Seg%x( iSegxT ) ) THEN
 !!$                iSegx = iSegxT - 1
 !!$                EXIT
@@ -619,7 +619,7 @@ END SUBROUTINE EvaluateSSP2D
 
        ! check y-segment contains x( 2 ) in [ SSP%Seg%y( iSegy ), SSP%Seg%y( iSegy + 1 ) )
        IF ( x( 2 ) < SSP%Seg%y( iSegy ) .OR. x( 2 ) >= SSP%Seg%y( iSegy + 1 ) ) THEN
-!!$          DO iSegyT = 2, SSP%Ny   ! Search for bracketting segment ranges
+!!$          DO iSegyT = 2, SSP%Ny   ! Search for bracketing segment ranges
 !!$             IF ( x( 2 ) < SSP%Seg%y( iSegyT ) ) THEN
 !!$                iSegy = iSegyT - 1
 !!$                EXIT
@@ -636,7 +636,7 @@ END SUBROUTINE EvaluateSSP2D
 
        ! check depth-layer contains x( 3 ) in [ SSP%Seg%z( iSegz ), SSP%Seg%z( iSegz + 1 ) ]
        IF ( x( 3 ) < SSP%Seg%z( iSegz ) .OR. x( 3 ) > SSP%Seg%z( iSegz + 1 ) ) THEN
-!!$          DO iz = 2, SSP%Nz   ! Search for bracketting Depths
+!!$          DO iz = 2, SSP%Nz   ! Search for bracketing Depths
 !!$             IF ( x( 3 ) < SSP%Seg%z( iz ) ) THEN
 !!$                iSegz = iz - 1
 !!$                EXIT
