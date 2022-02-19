@@ -211,6 +211,11 @@ CONTAINS
           WRITE( PRTFile, * ) 'Range for choosing beam width', Beam%rLoop
 
           ! Images, windows
+          ! LP: These values are not initialized if not written in the file,
+          ! and Component is not always written in the test env files.
+          Beam%Nimage = 1
+          Beam%iBeamWindow = 4
+          Beam%Component = 'P'
           READ(  ENVFile, * ) Beam%Nimage, Beam%iBeamWindow, Beam%Component
           WRITE( PRTFile, * )
           WRITE( PRTFile, * ) 'Number of images, Nimage  = ', Beam%Nimage

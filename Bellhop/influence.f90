@@ -146,7 +146,6 @@ CONTAINS
                       contri = ABS( contri ) ** 2
                    END SELECT
 
-                   ! WRITE( PRTFile, * ) 'iz ir is contri', iz-1, ir-1, is-2, contri
                    U( iz, ir ) = U( iz, ir ) + CMPLX( Hermite( n, RadiusMax, 2 * RadiusMax ) * contri )
                 END IF
              END DO RcvrRanges
