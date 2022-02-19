@@ -3,6 +3,7 @@ MODULE beampattern
   ! Loads a source beam pattern
 
   USE FatalError
+  USE monotonicMod
   SAVE
   INTEGER, PARAMETER         :: SBPFile = 50
   INTEGER                    :: NSBPPts          ! Number of source beam-pattern points
@@ -51,6 +52,13 @@ CONTAINS
        SrcBmPat( 1, : ) = [ -180.0, 0.0 ]
        SrcBmPat( 2, : ) = [  180.0, 0.0 ]
     ENDIF
+
+    ! LP: This requirement was not originally present. However, in
+    ! bellhop.f90:261, it looks for the largest angle below the target angle and
+    ! then linearly interpolates between that one and the next angle in the array.
+    ! This is only sensible if the angles are monotonically increasing.
+    IF ( .NOT. monotonic( SrcBmPat( :, 1 ) , NSBPPts ) ) &
+       CALL ERROUT( 'BELLHOP-ReadPat', 'Source beam pattern angles are not monotonic' )
 
     SrcBmPat( :, 2 ) = 10 ** ( SrcBmPat( :, 2 ) / 20 )  ! convert dB to linear scale
 

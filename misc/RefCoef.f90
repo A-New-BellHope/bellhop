@@ -55,6 +55,7 @@ CONTAINS
        RBot%phi = DegRad * RBot%phi   ! convert to radians
 
     ELSE   ! should allocate something anyway, since variable is passed
+       IF ( ALLOCATED( RBot ) ) DEALLOCATE( RBot ) ! LP: was missing deallocation
        ALLOCATE(  RBot( 1 ), Stat = IAllocStat )
     ENDIF
 
@@ -82,6 +83,7 @@ CONTAINS
        CLOSE( TRCFile )
        RTop%phi = DegRad *  RTop%phi   ! convert to radians
     ELSE   ! should allocate something anyway, since variable is passed
+       IF ( ALLOCATED( RTop ) ) DEALLOCATE( RTop ) ! LP: was missing deallocation
        ALLOCATE( RTop( 1 ), Stat = iAllocStat )
     ENDIF
 

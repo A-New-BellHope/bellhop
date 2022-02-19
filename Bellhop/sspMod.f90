@@ -743,6 +743,7 @@ END SUBROUTINE EvaluateSSP2D
 !!$     ! Homogeneous half-space
 !!$     xt   = 2.0 * ( 5000.0 - 1300.0 ) / 1300.0
 !!$     c    = C0 * ( 1.0 + 0.00737 * ( xt - 1.0 + EXP( -xt ) ) )
+!!$     cimag = 0.0
 !!$     cz   = 0.0
 !!$     czz  = 0.0
 !!$  END IF

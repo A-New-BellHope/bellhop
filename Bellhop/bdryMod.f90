@@ -44,7 +44,7 @@ CONTAINS
     INTEGER,            INTENT( IN ) :: PRTFile
     CHARACTER (LEN= 1), INTENT( IN ) :: TopATI
     REAL      (KIND=8), INTENT( IN ) :: DepthT
-    REAL      (KIND=8), ALLOCATABLE  :: phi( : )
+    ! REAL      (KIND=8), ALLOCATABLE  :: phi( : ) ! LP: Removed as seems to have been moved to ComputeBdryTangentNormal
     CHARACTER (LEN=80), INTENT( IN ) :: FileRoot
 
     SELECT CASE ( TopATI )
@@ -73,7 +73,8 @@ CONTAINS
        WRITE( PRTFile, * ) 'Number of altimetry points = ', NatiPts
        NatiPts = NatiPts + 2   ! we'll be extending the altimetry to infinity to the left and right
 
-       ALLOCATE( Top(  NatiPts ), phi( NatiPts ), Stat = IAllocStat )
+       ALLOCATE( Top( NatiPts ), Stat = IAllocStat )
+       ! ALLOCATE( phi( NatiPts ), Stat = IAllocStat ) ! LP: Removed as seems to have been moved to ComputeBdryTangentNormal
        IF ( IAllocStat /= 0 ) &
             CALL ERROUT( 'BELLHOP:ReadATI', 'Insufficient memory for altimetry data: reduce # ati points' )
 
@@ -290,7 +291,7 @@ CONTAINS
        ! averaging two centered differences is equivalent to forming a single centered difference of two steps ...
        DO ii = 2, NPts - 1
           sss = Bdry( ii - 1 )%Len / ( Bdry( ii - 1 )%Len + Bdry( ii )%Len )
-          sss = 0.5 ! Bug? Line above is overwritten.
+          sss = 0.5 ! LP: BUG? Line above is overwritten.
           Bdry( ii )%Nodet = ( 1.0 - sss ) * Bdry( ii - 1 )%t + sss * Bdry( ii )%t
        END DO
 
@@ -307,6 +308,10 @@ CONTAINS
        END SELECT
 
        ! compute curvature in each segment
+       ! LP: This allocation is not necessary, could just have two variables for
+       ! current and next phi. Operating on the whole array can trigger compiler
+       ! SIMD parallelism (AVX-512 etc.), but this is unlikely to happen for
+       ! atan2, and this is in one-time setup code anyway.
        ALLOCATE( phi( NPts ), Stat = IAllocStat )
        phi = atan2( Bdry( : )%Nodet( 2 ), Bdry( : )%Nodet( 1 ) )   ! this is the angle at each node
 
@@ -321,6 +326,8 @@ CONTAINS
 
           Bdry( ii )%kappa = Bdry( ii )%Dss   !over-ride kappa !!!!!
        END DO
+       
+       DEALLOCATE( phi ) ! LP: was missing deallocation
     ELSE
        Bdry%kappa = 0
     END IF
