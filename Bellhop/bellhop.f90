@@ -118,7 +118,8 @@ PROGRAM BELLHOP
 
      ALLOCATE( RBot( 1 ), Stat = IAllocStat )   ! bottom reflection coefficient
      ALLOCATE( RTop( 1 ), Stat = iAllocStat )   ! top    reflection coefficient
-     NBotPts = NTopPts = 1 ! LP: missing initialization
+     NBotPts = 1 ! LP: missing initialization
+     NTopPts = 1
 
      ! *** Source Beam Pattern ***
      NSBPPts = 2

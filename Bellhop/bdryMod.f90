@@ -86,13 +86,16 @@ CONTAINS
           SELECT CASE ( atiType( 2 : 2 ) )
           CASE ( 'S', '' )
              READ(  ATIFile, * ) Top( ii )%x
-             IF ( ii < Number_to_Echo .OR. ii == NatiPts ) THEN   ! echo some values
+             ! LP: This condition was previously ii == NatiPts,
+             ! which will never be satisfied due to the loop bounds
+             IF ( ii < Number_to_Echo .OR. ii == NatiPts - 1 ) THEN   ! echo some values
                 WRITE( PRTFile, FMT = "(2G11.3)" ) Top( ii )%x
              END IF
           CASE ( 'L' )
              READ(  ATIFile, * )                   Top( ii )%x, Top( ii )%HS%alphaR, Top( ii )%HS%betaR, Top( ii )%HS%rho, &
                                                                 Top( ii )%HS%alphaI, Top( ii )%HS%betaI
-             IF ( ii < Number_to_Echo .OR. ii == NatiPts ) THEN   ! echo some values
+             ! LP: Same change as above
+             IF ( ii < Number_to_Echo .OR. ii == NatiPts - 1 ) THEN   ! echo some values
                 WRITE( PRTFile, FMT = "(7G11.3)" ) Top( ii )%x, Top( ii )%HS%alphaR, Top( ii )%HS%betaR, Top( ii )%HS%rho, &
                                                                 Top( ii )%HS%alphaI, Top( ii )%HS%betaI
              END IF
@@ -184,13 +187,16 @@ CONTAINS
           SELECT CASE ( btyType( 2 : 2 ) )
           CASE ( 'S', '' )   ! short format
              READ(  BTYFile, * ) Bot( ii )%x
-             IF ( ii < Number_to_Echo .OR. ii == NbtyPts ) THEN   ! echo some values
+             ! LP: This condition was previously ii == NbtyPts,
+             ! which will never be satisfied due to the loop bounds
+             IF ( ii < Number_to_Echo .OR. ii == NbtyPts - 1 ) THEN   ! echo some values
                 WRITE( PRTFile, FMT = "(2G11.3)" ) Bot( ii )%x
              END IF
           CASE ( 'L' )       ! long format
              READ(  BTYFile, * )                   Bot( ii )%x, Bot( ii )%HS%alphaR, Bot( ii )%HS%betaR, Bot( ii )%HS%rho, &
                                                                 Bot( ii )%HS%alphaI, Bot( ii )%HS%betaI
-             IF ( ii < Number_to_Echo .OR. ii == NbtyPts ) THEN   ! echo some values
+             ! LP: Same change as above
+             IF ( ii < Number_to_Echo .OR. ii == NbtyPts - 1 ) THEN   ! echo some values
                 WRITE( PRTFile, FMT="( F10.2, F10.2, 3X, 2F10.2, 3X, F6.2, 3X, 2F10.4 )" ) &
                    Bot( ii )%x, Bot( ii )%HS%alphaR, Bot( ii )%HS%betaR, Bot( ii )%HS%rho, &
                                 Bot( ii )%HS%alphaI, Bot( ii )%HS%betaI

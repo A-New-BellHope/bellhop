@@ -80,7 +80,11 @@ CONTAINS
 
              ! Compute ray-centered coordinates, (znV, rnV)
 
-             IF ( ABS( znV( iS ) ) < tiny( znV( iS ) ) ) CYCLE Stepping   ! If normal parallel to TL-line, skip to next step on ray
+             ! If normal parallel to TL-line, skip to next step on ray
+             ! LP: Changed from tiny( znV( iS ) ) as this is the smallest
+             ! positive floating point number, which would be equivalent to just
+             ! znV( iS ) == 0.0.
+             IF ( ABS( znV( iS ) ) < SPACING( 1.0 ) ) CYCLE Stepping
 
              SELECT CASE ( image )     ! Images of beams
              CASE ( 1 )                ! True beam
@@ -219,6 +223,7 @@ CONTAINS
     END DO Stepping0
 
     Stepping: DO iS = 3, Beam%Nsteps
+       ! LP: BUG: Assumes rays may never travel left.
        IF ( ray2D( iS     )%x( 1 ) > Pos%Rr( Pos%NRr ) ) RETURN
        rA = ray2D( iS - 1 )%x( 1 )
        rB = ray2D( iS     )%x( 1 )
@@ -363,7 +368,7 @@ CONTAINS
 
           !!! this should be pre-computed
           q  = ray2D( iS - 1 )%q( 1 )
-          IF ( q <= 0.0d0 .AND. qOld > 0.0d0 .OR. q >= 0.0d0 .AND. qOld < 0.0d0 ) phase = phase + pi / 2.  ! phase shifts at caustics
+          CALL IncPhaseIfCaustic( .TRUE. )
           qold = q
 
           RcvrDeclAngle = RcvrDeclAngleV( iS )
@@ -384,9 +389,7 @@ CONTAINS
                 const    = ray2D( iS )%Amp / SQRT( ABS( q ) ) 
                 W        = ( L - n ) / L   ! hat function: 1 on center, 0 on edge
                 Amp      = const * W
-                phaseInt = ray2D( iS - 1 )%Phase + phase
-                !!! this should be precomputed
-                IF ( q <= 0.0d0 .AND. qOld > 0.0d0 .OR. q >= 0.0d0 .AND. qOld < 0.0d0 ) phaseInt = phase + pi / 2.   ! phase shifts at caustics
+                CALL FinalPhase( )
 
                 CALL ApplyContribution( U( iz, ir ) )
              END IF
@@ -417,7 +420,7 @@ CONTAINS
     qOld         = ray2D( 1 )%q( 1 )       ! used to track KMAH index
     rA           = ray2D( 1 )%x( 1 )       ! range at start of ray
 
-    ! what if never satistified?
+    ! what if never satisfied?
     ! what if there is a single receiver (ir = 0 possible)
     irT = MINLOC( Pos%Rr( 1 : Pos%NRr ), MASK = Pos%Rr( 1 : Pos%NRr ) > rA )   ! find index of first receiver to the right of rA
     ir  = irT( 1 )
@@ -441,7 +444,7 @@ CONTAINS
        dtauds = ray2D( iS )%tau    - ray2D( iS - 1 )%tau
 
        q  = ray2D( iS - 1 )%q( 1 )
-       IF ( q <= 0.0d0 .AND. qOld > 0.0d0 .OR. q >= 0.0d0 .AND. qOld < 0.0d0 ) phase = phase + pi / 2.   ! phase shifts at caustics
+       CALL IncPhaseIfCaustic( .TRUE. )
        qold = q
 
        RadiusMax = MAX( ABS( ray2D( iS - 1 )%q( 1 ) ), ABS( ray2D( iS )%q( 1 ) ) ) / q0 / ABS( rayt( 1 ) ) ! beam radius projected onto vertical line
@@ -480,8 +483,7 @@ CONTAINS
                    const    = Ratio1 * SQRT( ray2D( iS )%c / ABS( q ) ) * ray2D( iS )%Amp
                    W        = ( RadiusMax - n ) / RadiusMax   ! hat function: 1 on center, 0 on edge
                    Amp      = const * W
-                   phaseInt = ray2D( iS - 1 )%Phase + phase
-                   IF ( q <= 0.0d0 .AND. qOld > 0.0d0 .OR. q >= 0.0d0 .AND. qOld < 0.0d0 ) phaseInt = phase + pi / 2.   ! phase shifts at caustics
+                   CALL FinalPhase( )
 
                    CALL ApplyContribution( U( iz, ir ) )
                 END IF
@@ -525,7 +527,7 @@ CONTAINS
     qOld         = ray2D( 1 )%q( 1 )       ! used to track KMAH index
     rA           = ray2D( 1 )%x( 1 )       ! range at start of ray
 
-    ! what if never satistified?
+    ! what if never satisfied?
     ! what if there is a single receiver (ir = 0 possible)
 
     irT = MINLOC( Pos%Rr( 1 : Pos%NRr ), MASK = Pos%Rr( 1 : Pos%NRr ) > rA )      ! find index of first receiver to the right of rA
@@ -557,7 +559,7 @@ CONTAINS
        dtauds = ray2D( iS )%tau    - ray2D( iS - 1 )%tau
 
        q  = ray2D( iS - 1 )%q( 1 )
-       IF ( q <= 0.0 .AND. qOld > 0.0 .OR. q >= 0.0 .AND. qOld < 0.0 ) phase = phase + pi / 2.   ! phase shifts at caustics
+       CALL IncPhaseIfCaustic( .TRUE. )
        qold = q
 
        ! calculate beam width
@@ -609,8 +611,7 @@ CONTAINS
                    const    = Ratio1 * SQRT( ray2D( iS )%c / ABS( q ) ) * ray2D( iS )%Amp
                    W        = EXP( -0.5 * ( n / sigma ) ** 2 ) / ( sigma * A )   ! Gaussian decay
                    Amp      = const * W
-                   phaseInt = ray2D( iS )%Phase + phase
-                   IF ( q <= 0.0d0 .AND. qOld > 0.0d0 .OR. q >= 0.0d0 .AND. qOld < 0.0d0 ) phaseInt = phase + pi / 2.  ! phase shifts at caustics
+                   CALL FinalPhase( )
 
                    CALL ApplyContribution( U( iz, ir ) )
                 END IF
@@ -670,7 +671,9 @@ CONTAINS
     REAL    (KIND=8)  :: x( 2 ), rayt( 2 ), A, beta, cn, CPA, deltaz, DS, sint, SX1, thet
     COMPLEX (KIND=8)  :: contri, tau
 
-    Ratio1 = SQRT(  COS( alpha ) )
+    ! LP: Added ABS to match other influence functions. Without it, this will
+    ! crash (sqrt of negative real) for rays shot backwards.
+    Ratio1 = SQRT( ABS(  COS( alpha ) ) )
     phase  = 0
     qOld   = 1.0
     BETA   = 0.98  ! Beam Factor
@@ -685,10 +688,15 @@ CONTAINS
 
        ! phase shifts at caustics
        q  = ray2D( iS - 1 )%q( 1 )
-       IF ( q < 0.0d0 .AND. qOld >= 0.0d0 .OR. q > 0.0d0 .AND. qOld <= 0.0d0 ) phase = phase + pi / 2.
+       CALL IncPhaseIfCaustic( .FALSE. )
        qold = q
 
-       RcvrRanges: DO WHILE ( ABS( rB - rA ) > 1.0D3 * SPACING( rA ) .AND. rB > Pos%Rr( ir ) )   ! Loop over bracketed receiver ranges
+       ! Loop over bracketed receiver ranges
+       ! LP: BUG: This way of setting up the loop assumes the ray always travels
+       ! towards positive R, which is not true for certain bathymetries (or for
+       ! rays simply shot backwards, which previously would also crash during
+       ! the setup, see above).
+       RcvrRanges: DO WHILE ( ABS( rB - rA ) > 1.0D3 * SPACING( rA ) .AND. rB > Pos%Rr( ir ) )
 
           W     = ( Pos%Rr( ir ) - rA ) / ( rB - rA )
           x     = ray2D( iS - 1 )%x      + W * ( ray2D( iS )%x      - ray2D( iS - 1 )%x )
@@ -699,7 +707,7 @@ CONTAINS
           ! following is incorrect because ray doesn't always use a step of deltas
           SINT  = ( iS - 1 ) * Beam%deltas + W * Beam%deltas
 
-          IF ( q < 0.0d0 .AND. qOld >= 0.0d0 .OR. q > 0.0d0 .AND. qOld <= 0.0d0 ) phase = phase + pi / 2. ! phase shifts at caustics
+          CALL IncPhaseIfCaustic( .FALSE. )
 
           RcvrDepths: DO iz = 1, NRz_per_range
              deltaz =  Pos%Rz( iz ) - x( 2 )   ! ray to rcvr distance
@@ -830,5 +838,50 @@ CONTAINS
     !hermit = hermit / ( 0.5 * ( x1 + x2 ) )
 
   END FUNCTION Hermite
+  
+  ! **********************************************************************!
+  
+  SUBROUTINE FinalPhase( )
+    
+    ! phase shifts at caustics
+    !!! this should be precomputed
+    ! LP: The ray point phase is discarded if the condition is met, is this correct?
+    
+    phaseInt = ray2D( iS )%Phase + phase
+    IF ( IsAtCaustic( .TRUE. ) ) &
+       phaseInt = phase + pi / 2.
+    
+  END SUBROUTINE FinalPhase
+  
+  ! **********************************************************************!
+  
+  SUBROUTINE IncPhaseIfCaustic( qleq0 )
+      
+    ! phase shifts at caustics
+    
+    LOGICAL, INTENT( IN ) :: qleq0
+    
+    IF ( IsAtCaustic( qleq0 ) ) &
+       phase = phase + pi / 2.
+  
+  END SUBROUTINE IncPhaseIfCaustic
+  
+  ! **********************************************************************!
+  
+  LOGICAL FUNCTION IsAtCaustic( qleq0 )
+      
+    ! LP: There are two versions of the phase shift condition used in the
+    ! BELLHOP code, with the equalities in opposite positions. qleq0 false is
+    ! only used in SGB.
+    
+    LOGICAL, INTENT( IN ) :: qleq0
+    
+    IF ( qleq0 ) THEN
+       IsAtCaustic = q <= 0.0d0 .AND. qOld >  0.0d0 .OR. q >= 0.0d0 .AND. qOld <  0.0d0
+    ELSE
+       IsAtCaustic = q <  0.0d0 .AND. qOld >= 0.0d0 .OR. q >  0.0d0 .AND. qOld <= 0.0d0
+    END IF
+     
+  END FUNCTION IsAtCaustic
 
 END MODULE Influence

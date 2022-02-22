@@ -22,8 +22,8 @@ CONTAINS
     REAL                     :: deltax
 
     IF ( Nx >= 3 ) THEN
-       IF ( ABS( x( 3 ) - -999.9 ) < 0.01 ) THEN
-          IF ( ABS( x( 2 ) - -999.9 ) < 0.01 ) x( 2 ) = x( 1 )
+       IF ( ABS( x( 3 ) - ( -999.9 ) ) < 0.01 ) THEN
+          IF ( ABS( x( 2 ) - ( -999.9 ) ) < 0.01 ) x( 2 ) = x( 1 )
           deltax      = ( x( 2 ) - x( 1 ) ) / ( Nx - 1 )
           x( 1 : Nx ) = x( 1 ) + [ ( ix, ix = 0, Nx - 1 ) ] * deltax
        END IF
@@ -38,8 +38,8 @@ CONTAINS
     REAL (KIND=8)                  :: deltax
 
     IF ( Nx >= 3 ) THEN
-       IF ( ABS( x( 3 ) - -999.9D0 ) < 0.01D0 ) THEN
-          IF ( ABS( x( 2 ) - -999.9D0 ) < 0.01D0 ) x( 2 ) = x( 1 )
+       IF ( ABS( x( 3 ) - ( -999.9D0 ) ) < 0.01D0 ) THEN
+          IF ( ABS( x( 2 ) - ( -999.9D0 ) ) < 0.01D0 ) x( 2 ) = x( 1 )
           deltax      = ( x( 2 ) - x( 1 ) ) / ( Nx - 1 )
           x( 1 : Nx ) = x( 1 ) + [ ( ix, ix = 0, Nx - 1 ) ] * deltax
        END IF
