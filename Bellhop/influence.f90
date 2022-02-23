@@ -662,13 +662,13 @@ CONTAINS
                  
   ! **********************************************************************!
 
-  SUBROUTINE InfluenceSGB( U, alpha, Dalpha )
+  SUBROUTINE InfluenceSGB( U, alpha, Dalpha, RadiusMax )
 
     ! Bucker's Simple Gaussian Beams in Cartesian coordinates
 
-    REAL (KIND=8), INTENT( IN    ) :: alpha, dalpha                 ! take-off angle, angular spacing
+    REAL (KIND=8), INTENT( IN    ) :: alpha, dalpha, RadiusMax      ! take-off angle, angular spacing
     COMPLEX,       INTENT( INOUT ) :: U( NRz_per_range, Pos%NRr )   ! complex pressure field
-    REAL    (KIND=8)  :: x( 2 ), rayt( 2 ), A, beta, cn, CPA, deltaz, DS, sint, SX1, thet
+    REAL    (KIND=8)  :: x( 2 ), rayt( 2 ), A, beta, cn, CPA, Adeltaz, deltaz, DS, sint, SX1, thet
     COMPLEX (KIND=8)  :: contri, tau
 
     ! LP: Added ABS to match other influence functions. Without it, this will
@@ -683,7 +683,9 @@ CONTAINS
     ir     = 1
 
     Stepping: DO iS = 2, Beam%Nsteps
-
+      
+       RcvrDeclAngle = RadDeg * ATAN2( ray2D( iS )%t( 2 ), ray2D( iS )%t( 1 ) )
+       
        rB = ray2D( iS )%x( 1 )
 
        ! phase shifts at caustics
@@ -704,30 +706,36 @@ CONTAINS
           q     = ray2D( iS - 1 )%q( 1 ) + W * ( ray2D( iS )%q( 1 ) - ray2D( iS - 1 )%q( 1 ) )
           tau   = ray2D( iS - 1 )%tau    + W * ( ray2D( iS )%tau    - ray2D( iS - 1 )%tau )
 
-          ! following is incorrect because ray doesn't always use a step of deltas
+          ! BUG: following is incorrect because ray doesn't always use a step of deltas
+          ! LP: The do while ignores extremely small steps, but those small steps
+          ! still increment iS, so the later ray segments still treat it as if
+          ! all steps leading up to them were of size deltas.
           SINT  = ( iS - 1 ) * Beam%deltas + W * Beam%deltas
 
           CALL IncPhaseIfCaustic( .FALSE. )
 
           RcvrDepths: DO iz = 1, NRz_per_range
              deltaz =  Pos%Rz( iz ) - x( 2 )   ! ray to rcvr distance
-             ! Adeltaz    = ABS( deltaz )
-             ! IF ( Adeltaz < RadiusMax ) THEN
-             SELECT CASE( Beam%RunType( 1 : 1 ) )
-             CASE ( 'E' )         ! eigenrays
+             ! LP: Reinstated this condition for eigenrays and arrivals, as
+             ! without it every ray would be an eigenray / arrival.
+             Adeltaz    = ABS( deltaz )
+             IF ( Adeltaz < RadiusMax .OR. Beam%RunType( 1 : 1 ) == 'C' &
+                   .OR. Beam%RunType( 1 : 1 ) == 'I' .OR. Beam%RunType( 1 : 1 ) == 'S' ) THEN
+                ! LP: Changed to use ApplyContribution in order to support 
+                ! incoherent, semi-coherent, and arrivals.
                 SrcDeclAngle = RadDeg * alpha   ! take-off angle in degrees
-                CALL WriteRay2D( SrcDeclAngle, iS )
-             CASE DEFAULT         ! coherent TL
                 CPA    = ABS( deltaz * ( rB - rA ) ) / SQRT( ( rB - rA )**2 + ( ray2D( iS )%x( 2 ) - ray2D( iS - 1 )%x( 2 ) )**2  )
                 DS     = SQRT( deltaz **2 - CPA **2 )
                 SX1    = SINT + DS
                 thet   = ATAN( CPA / SX1 )
                 delay  = tau + rayt( 2 ) * deltaz
-                contri = Ratio1 * CN * ray2D( iS )%Amp * EXP( -A * thet ** 2 - &
-                     i * ( omega * delay - ray2D( iS )%Phase - phase ) ) / SQRT( SX1 )
-                U( iz, ir ) = U( iz, ir ) + CMPLX( contri )
-             END SELECT
-             ! END IF
+                const  = Ratio1 * CN * ray2D( iS )%Amp / SQRT( SX1 )
+                W      = EXP( -A * thet ** 2 )
+                Amp    = const * W
+                phaseInt = ray2D( iS )%Phase + phase
+                CALL ApplyContribution( U( iz, ir ) )
+                
+             END IF
           END DO RcvrDepths
 
           qOld = q
