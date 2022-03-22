@@ -1,10 +1,11 @@
 # BELLHOP
-A mirror of the original FORTRAN BELLHOP underwater acoustics simulator, with
-some bugs fixed.
+A mirror of the original Fortran BELLHOP underwater acoustics simulator, with
+numerical properties and robustness improved and bugs fixed.
 
-# Impressum
+### Impressum
 
-Copyright (C) 2021 A-New-BellHope (Jules Jaffe team)
+Copyright (C) 2021-2022 The Regents of the University of California \
+c/o Jules Jaffe team at SIO / UCSD, jjaffe@ucsd.edu \
 Copyright (C) 1983-2020 Michael B. Porter
 
 This program is free software: you can redistribute it and/or modify
@@ -20,13 +21,87 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Bugs fixed
+# Summary of changes
 
 ### iSegz, iSegr initialization
 
-In BELLHOP, `iSegz` and `iSegr` are initialized (to 1) only once globally. This
-means their initial state for each ray is their final state from the previous
-ray. *Normally, this shouldn't matter, because the segment indices are
+In `BELLHOP`, `iSegz` and `iSegr` are initialized (to 1) only once globally. In
+some cases (a source on a boundary), in conjunction with other subtle issues,
+the missing initialization caused the initial state of one ray to be dependent
+on the final state of the previous ray, which is obviously non-physical and
+makes reproducing certain results impossible. This has been fixed by
+reinitializing them before every ray.
+
+### Boundary stepping changes
+
+How edge cases are handled seems like it should only affect a small fraction of
+results in any program. However, in `BELLHOP`, the step size for the numerical
+integration is typically set to a large value, and is then reduced so that the
+step lands on the nearest "boundary". (Here, this refers not only to the ocean
+surface and floor, but to any "plane" within the ocean where the SSP changes,
+where the bottom has a corner/vertex in its definition, and so on.) Thus,
+for typical runs, every step of every ray in `BELLHOP` lands on an edge case.
+Depending on the exact set of floating-point operations done and the specific
+inputs, these steps "randomly" land just before or just after the boundary.
+This means the step ends up in different regions, which leads to further
+differences down the line. While these differences typically have a very small
+effect on the overall ray trajectory, they make comparing the results to [the
+C++/CUDA version](https://github.com/A-New-BellHope/bellhopcuda) very difficult,
+and may in some cases make reproducing results between runs of the Fortran
+program difficult. This has been fixed by overhauling the system which moves
+the numerical integration to the boundary to give predictable behavior. This
+also involved changes to reflections (landing on the top or bottom boundary);
+now a consistent number of duplicate ray points are produced at the reflection
+points.
+
+### Shallow angle range
+
+In `InfluenceGeoGaussianCart`, a ray is considered to be at a shallow angle if
+its angle is less than or equal to 60 degrees, and a steep ray otherwise. The
+handling of these two cases is completely different, i.e. there is a
+discontinuity as the ray angle passes 60 degrees. However, some environment
+files trace rays at round number angles, including exactly 60 degrees.
+Differences in the set of floating-point operations used can cause these rays
+to be considered on one side or the other of this boundary, leading to different
+results. This cannot be fully fixed without changing the physics of the
+simulation (i.e. remove the discontinuity), so instead the discontinuity has
+been moved slightly away from the round number to increase the chances of
+consistent results.
+
+### Polarity flipping
+
+In `InfluenceCervenyRayCen`, `rnV` was negated for image 2 and again for image 3.
+If `Nimage` was set to 2, this means `rnV` would change sign every step. mbp
+had implemented this differently (without the bug) in `InfluenceCervenyCart`,
+so that implementation was brought to this function.
+
+### Missing initialization on some beam parameters
+
+The beam parameters `Nimage`, `iBeamWindow`, and `Component` were not
+initialized in code, and not all `BELLHOP`-provided test `.env` files initialize
+`Component`. The value of uninitialized variables in Fortran is not defined.
+Reasonable initializations have been added to these parameters.
+
+### SGB eigenrays and arrivals
+
+`InfluenceSGB` had code to support eigenrays, but the condition to check the
+distance from the receiver was commented out, meaning that every ray would be
+an eigenray. Furthermore, it assumed that any run other than eigenrays was
+coherent TL, ignoring incoherent, semi-coherent, and arrivals. This function
+was reworked to use `ApplyContribution` to support all of these run types.
+
+### Other
+
+Minor fixes which should not affect results unless you're doing something
+strange. See commit logs.
+
+# Detailed information on some changes
+
+### iSegz, iSegr initialization
+
+In `BELLHOP`, `iSegz` and `iSegr` are initialized (to 1) only once globally.
+This means their initial state for each ray is their final state from the
+previous ray. *Normally, this shouldn't matter, because the segment indices are
 recomputed if they are wrong; but...*
 
 SSP checks whether the current depth and range are within the current segment,
@@ -58,10 +133,10 @@ which segment the previous ray happened to end in. *Normally, this shouldn't
 matter, because one extra infinitesimally small step should not substantially
 change the field results; but...*
 
-The SGB (Bucker's Simple Gaussian Beams) Total Level influence algorithm has a
-bug, acknowledged by mbp in code comments, where every step is assumed to be of
-the full, maximum step size, which is often 500 m or larger. Thus, one extra
-infinitesimally small step is actually one extra full-size step, which
+The SGB (Bucker's Simple Gaussian Beams) transmission loss influence algorithm
+has a bug, acknowledged by mbp in code comments, where every step is assumed to
+be of the full, maximum step size, which is often 500 m or larger. Thus, one
+extra infinitesimally small step is actually one extra full-size step, which
 substantially impacts the field results from this beam. Again, this change
 happens "randomly" based on the final state of the previous ray/beam traced.
 
@@ -72,7 +147,7 @@ but at least it produces reproducible results now.
 
 # Other information
 
-See index.htm for further information.
+See index.htm for information from the original repo.
 
 Code retrieved 12/17/21 from http://oalib.hlsresearch.com/AcousticsToolbox/
 claimed to have been updated 11/4/20.

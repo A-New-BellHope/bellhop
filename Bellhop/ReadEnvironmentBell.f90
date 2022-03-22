@@ -630,7 +630,7 @@ CONTAINS
     CASE DEFAULT
        atten = 0.0
 
-       ! following to set PlotType has alread been done in READIN if that was used for input
+       ! following to set PlotType has already been done in READIN if that was used for input
        SELECT CASE ( Beam%RunType( 5 : 5 ) )
        CASE ( 'R' )
           PlotType = 'rectilin  '
