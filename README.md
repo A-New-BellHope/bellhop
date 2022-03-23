@@ -43,7 +43,7 @@ where the bottom has a corner/vertex in its definition, and so on.) Thus, for
 typical runs, every step of every ray in `BELLHOP` lands on an edge case.
 Depending on the exact set of floating-point operations done and the specific
 inputs, these steps "randomly" land just before or just after the boundary. This
-means the step "randomly" ends up in different regions, which leads to further
+means the step "randomly" ends up in different segments, which leads to further
 differences down the line. While these differences typically have a very small
 effect on the overall ray trajectory, they make comparing the results to [the
 C++/CUDA version](https://github.com/A-New-BellHope/bellhopcuda) very difficult,
@@ -176,7 +176,8 @@ produce binary identical outputs for identical input files. However, for some
 set of rays shot toward the same boundary, some set of them will land on each
 side of the boundary, without any discernible pattern to this behavior. And a
 version of `BELLHOP` built with a different compiler or on a different machine,
-or of course our C++/CUDA version, will produce a different pattern.
+or of course [our C++/CUDA version](https://github.com/A-New-BellHope/bellhopcuda),
+will produce a different pattern.
 
 Despite this behavior only causing an infinitesimal difference in the resulting
 ray position, this difference gets amplified by `BELLHOP`, and can lead to a
@@ -195,7 +196,7 @@ receiver to influence it is a hard edge for certain influence types. For runs
 with tens of thousands each of rays and receivers, it is not rare that a ray
 will be close enough to a receiver to "count" in one case, and too far in the
 other case. If this ray happens to be the only ray to influence this receiver,
-the relative difference between the finite TL and zero is an *infinite* error!
+the relative difference between the finite field and zero is an *infinite* error!
 - If the ray approaches a corner between two different boundaries (e.g. SSP
 depth and range)--as is not rare in the environment files where everything is
 round numbers!--the ray may hit one boundary or the other first depending on
@@ -209,8 +210,9 @@ will then hit the seamount and reflect in a completely different direction.
 too low, but crucially the last step which violated the stopping condition is
 still written. If a ray stops after a step to a certain boundary, whether
 receivers on that boundary are considered for TL / eigenrays / arrivals is
-determined by whether the ray is behind or ahead of that boundary. This can
-substantially change their outputs.
+determined by whether the ray is behind or ahead of that boundary. Of course,
+since environment files use round numbers, receivers being exactly on boundaries
+is very common! This can substantially change their outputs.
 
 These issues are fixed with two main changes. First, a function `StepToBdry2D`
 is added which corresponds to `ReduceStep2D`. This function ensures that after
@@ -221,16 +223,16 @@ which segment a position is in have been changed to use the ray tangent to
 resolve edge cases, instead of choosing between less-than-or-equal-to versus
 less-than and such. The ray is always placed into the later segment: the
 segment such that it can move forward a nontrival distance and remain in the
-same segment. The idea is, since every step must be an edge case, they will be
-*exactly* on the edge, and then that exactly-on-the-edge position will be
-handled in a consistent manner.
+same segment. The idea is, since every step must be an edge case, they are
+*exactly* on the edge, and then that exactly-on-the-edge position are handled in
+a consistent manner.
 
 # Other information
 
 See index.htm for information from the original repo.
 
-Code retrieved 12/17/21 from http://oalib.hlsresearch.com/AcousticsToolbox/
-claimed to have been updated 11/4/20.
+Code retrieved 12/17/21 from http://oalib.hlsresearch.com/AcousticsToolbox/ ,
+and was claimed to have been last updated 11/4/20.
 
 Files pertaining to the other simulators (Krakel, Kraken, KrakenField, Scooter)
 have been removed.
