@@ -163,7 +163,8 @@ CONTAINS
     ! top crossing
     h2 = huge( h2 )
     d  = x - Topx              ! vector from top to ray
-    IF ( DOT_PRODUCT( Topn, d ) > EPSILON( h2 ) ) THEN
+    ! LP: Changed from EPSILON( h2 ) to 0 in conjunction with StepToBdry2D change here.
+    IF ( DOT_PRODUCT( Topn, d ) > 0.0D0 ) THEN
        d0  = x0 - Topx         ! vector from top    node to ray origin
        h2 = -DOT_PRODUCT( d0, Topn ) / DOT_PRODUCT( urayt, Topn )
     END IF
@@ -171,7 +172,9 @@ CONTAINS
     ! bottom crossing
     h3 = huge( h3 )
     d  = x - Botx              ! vector from bottom to ray
-    IF ( DOT_PRODUCT( Botn, d ) > EPSILON( h2 ) ) THEN
+    ! LP: Changed from EPSILON( h2 ) (should have been h3!) to 0 in conjunction 
+    ! with StepToBdry2D change here.
+    IF ( DOT_PRODUCT( Botn, d ) > 0.0D0 ) THEN
        d0  = x0 - Botx         ! vector from bottom node to ray origin
        h3 = -DOT_PRODUCT( d0, Botn ) / DOT_PRODUCT( urayt, Botn )
     END IF
@@ -237,7 +240,11 @@ CONTAINS
 
     ! top crossing
     d = x2 - Topx             ! vector from top to ray
-    IF ( DOT_PRODUCT( Topn, d ) > EPSILON( h ) ) THEN
+    ! Originally, this value had to be > a small positive number, meaning the
+    ! new step really had to be outside the boundary, not just to the boundary.
+    ! Also, this is not missing a normalization factor, Topn is normalized so
+    ! this is actually the distance above the top in meters.
+    IF ( DOT_PRODUCT( Topn, d ) > -INFINITESIMAL_STEP_SIZE ) THEN
        d0 = x0 - Topx         ! vector from top node to ray origin
        h = -DOT_PRODUCT( d0, Topn ) / DOT_PRODUCT( urayt, Topn )
        x2 = x0 + h * urayt
@@ -253,7 +260,8 @@ CONTAINS
 
     ! bottom crossing
     d = x2 - Botx              ! vector from bottom to ray
-    IF ( DOT_PRODUCT( Botn, d ) > EPSILON( h ) ) THEN
+    ! See comment above for top case.
+    IF ( DOT_PRODUCT( Botn, d ) > -INFINITESIMAL_STEP_SIZE ) THEN
        d0  = x0 - Botx         ! vector from bottom node to ray origin
        h = -DOT_PRODUCT( d0, Botn ) / DOT_PRODUCT( urayt, Botn )
        x2 = x0 + h * urayt

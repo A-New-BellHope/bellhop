@@ -50,8 +50,9 @@ C++/CUDA version](https://github.com/A-New-BellHope/bellhopcuda) very difficult,
 and may in some cases make reproducing results between runs of the Fortran
 program difficult. This has been fixed by overhauling the system which moves the
 numerical integration to the boundary to give predictable behavior. This also
-involved changes to reflections (landing on the top or bottom boundary); now a
-consistent number of duplicate ray points are produced at the reflection points.
+involved changes to reflections (landing on the top or bottom boundary); now
+consistently only two identical points are generated at reflections, one with
+the incoming tangent and one with it outgoing.
 
 ### Polarity flipping
 
