@@ -113,7 +113,7 @@ SUBROUTINE EvaluateSSP2D( x2D, t2D, c, cimag, gradc, crr, crz, czz, rho, xs, tra
 
   ! convert polar coordinate to cartesian
   x = [ xs( 1 ) + x2D( 1 ) * tradial( 1 ), xs( 2 ) + x2D( 1 ) * tradial( 2 ), x2D( 2 ) ]
-  t = [ xs( 1 ) + t2D( 1 ) * tradial( 1 ), xs( 2 ) + t2D( 1 ) * tradial( 2 ), t2D( 2 ) ]
+  t = [           t2D( 1 ) * tradial( 1 ),           t2D( 1 ) * tradial( 2 ), t2D( 2 ) ]
 
   CALL EvaluateSSP3D( x, t, c, cimag, gradc3D, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
 
@@ -362,7 +362,7 @@ END SUBROUTINE EvaluateSSP2D
 
   SUBROUTINE Quad( x, t, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
 
-    ! Bilinear quadrilatteral interpolation of SSP data in 2D
+    ! Bilinear quadrilateral interpolation of SSP data in 2D
 
     INTEGER,           PARAMETER      :: SSPFile = 40
     REAL      (KIND=8), INTENT( IN  ) :: freq
@@ -546,7 +546,13 @@ END SUBROUTINE EvaluateSSP2D
        ! SSP matrix should be bigger than 2x2x2
        IF ( SSP%Nx < 2 .OR. SSP%Ny < 2 .OR. SSP%Nz < 2 ) THEN
           CALL ERROUT( 'READIN: Hexahedral', &
-               'You must have a least two points in x, y, z directions in your 3D SSP field'  )
+               'You must have at least two points in x, y, z directions in your 3D SSP field'  )
+       END IF
+       
+       IF ( SSP%Nz .GE. MaxSSP ) THEN
+          ! LP: SSP%Nz / SSP%Seg%z will get assigned to SSP%z / SSP%NPts.
+          CALL ERROUT( 'READIN: Hexahedral', &
+               'Number of SSP points in Z exceeds limit' )
        END IF
 
        ALLOCATE( SSP%cMat3( SSP%Nx, SSP%Ny, SSP%Nz ), SSP%czMat3( SSP%Nx, SSP%Ny, SSP%Nz - 1 ), STAT = AllocateStatus )
@@ -686,8 +692,8 @@ END SUBROUTINE EvaluateSSP2D
 
        c  = c1  + s1 * ( c2 - c1   )   ! interpolation in x
 
-       ! interpolate the attenuation !!!! This will use the wrong segment if the ssp in the envil is sampled at different depths
-       s3 = s3 / ( SSP%z( iSegz + 1 ) - SSP%z( iSegz ) )   ! convert s3 to a proportional distance in thew layer
+       ! interpolate the attenuation !!!! This will use the wrong segment if the ssp in the envfil is sampled at different depths
+       s3 = s3 / ( SSP%z( iSegz + 1 ) - SSP%z( iSegz ) )   ! convert s3 to a proportional distance in the layer
        cimag = AIMAG( ( 1.0D0 - s3 ) * SSP%c( Isegz )  + s3 * SSP%c( Isegz + 1 ) )   ! volume attenuation is taken from the single c(z) profile
 
        cx = ( c2 - c1 ) / ( SSP%Seg%x( iSegx + 1 ) - SSP%Seg%x( iSegx ) )
@@ -695,7 +701,7 @@ END SUBROUTINE EvaluateSSP2D
        ! same thing on cz
        cz1 = cz11 + s2 * ( cz21 - cz11 )
        cz2 = cz12 + s2 * ( cz22 - cz12 )
-       cz  = cz1  + s1 * ( cz2  - cz1  )   ! interpolation in x
+       cz  = cz1  + s1 * ( cz2  - cz1  )   ! interpolation in z
 
        !gradc = [ cx, cy, cz ]
        gradc( 1 ) = cx

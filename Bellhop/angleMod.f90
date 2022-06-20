@@ -78,7 +78,7 @@ CONTAINS
 
     IF ( TopOpt( 6 : 6 ) == 'I' ) THEN
        IF ( Angles%iSingle_alpha < 1 .OR. Angles%iSingle_alpha > Angles%Nalpha ) &
-            CALL ERROUT( 'ReadRayElevationAngles', 'Selected beam, iSingl not in [ 1, Angles%Nalpha ]' )
+            CALL ERROUT( 'ReadRayElevationAngles', 'Selected beam, iSingle_alpha not in [ 1, Angles%Nalpha ]' )
     END IF
 
   END SUBROUTINE ReadRayElevationAngles
@@ -142,7 +142,7 @@ CONTAINS
 
     IF ( TopOpt( 6 : 6 ) == 'I' ) THEN
        IF ( Angles%iSingle_beta < 1 .OR. Angles%iSingle_beta > Angles%Nbeta ) &
-            CALL ERROUT( 'ReadRayBearingAngles', 'Selected beam, iSingl not in [ 1, Angles%Nbeta ]' )
+            CALL ERROUT( 'ReadRayBearingAngles', 'Selected beam, iSingle_beta not in [ 1, Angles%Nbeta ]' )
     END IF
     Angles%beta  = DegRad * Angles%beta   ! convert to radians
 

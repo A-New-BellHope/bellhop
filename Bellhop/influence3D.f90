@@ -222,7 +222,7 @@ CONTAINS
                       ! The set of possible receivers is a ring
                       ! However, extrapolating the beam backwards produces contributions with s negative and large
                       ! We do not want to accept these contributions--- they have the proper range but are 180 degrees
-                      ! away from this segement of the ray
+                      ! away from this segment of the ray
                       ! s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - x_ray( 1 : 2 ), rayt( 1 : 2 ) / NORM2( rayt( 1 : 2 ) ) )   ! a distance along ray    (in x-y plane)
                       ! s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - xs( 1 : 2 ), t_rcvr( 1 : 2, itheta ) ) ! a distance along radial (in x-y plane)
                       s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - xs( 1 : 2 ), x_ray( 1 : 2 ) - xs( 1 : 2 ) ) ! vector to rcvr dotted into vector to ray point
@@ -564,7 +564,7 @@ CONTAINS
                       ! The set of possible receivers is a ring
                       ! However, extrapolating the beam backwards produces contributions with s negative and large
                       ! We do not want to accept these contributions--- they have the proper range but are 180 degrees
-                      ! away from this segement of the ray
+                      ! away from this segment of the ray
 !!! pre-calculate unit ray tangent
                       ! s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - x_ray( 1 : 2 ), rayt( 1 : 2 ) / NORM2( rayt( 1 : 2 ) ) )   ! a distance along ray    (in x-y plane)
                       ! s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - xs( 1 : 2 ), t_rcvr( 1 : 2, itheta ) ) ! a distance along radial (in x-y plane)

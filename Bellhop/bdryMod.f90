@@ -28,7 +28,7 @@ MODULE bdrymod
   TYPE BdryPt
      REAL    (KIND=8) :: x( 2 ), t( 2 ), n( 2 )        ! coordinate, tangent, and outward normal for a segment
      REAL    (KIND=8) :: Nodet( 2 ), Noden( 2 )        ! tangent and normal at the node, if the curvilinear option is used
-     REAL    (KIND=8) :: Len, Kappa                    ! length and curvature of a segement
+     REAL    (KIND=8) :: Len, Kappa                    ! length and curvature of a segment
      REAL    (KIND=8) :: Dx, Dxx, Dss                  ! first, second derivatives wrt depth; s is along tangent
      TYPE( HSInfo2 )   :: HS
   END TYPE

@@ -78,6 +78,8 @@ CONTAINS
 
     CALL EvaluateSSP3D( ray1%x, ray1%t, c1, cimag1, gradc1, cxx1, cyy1, czz1, cxy1, cxz1, cyz1, rho, freq, 'TAB' )
     rayt = c1 * ray1%t           ! unit tangent to ray
+    ! LP: BUG: should be ray1%phi; ray2%phi would be uninitialized memory or
+    ! left over from the previous ray
     CALL RayNormal_unit( rayt, ray2%phi, e1, e2 )
     CALL Get_c_partials( cxx1, cxy1, cxz1, cyy1, cyz1, czz1, e1, e2, cnn1, cmn1, cmm1 ) ! Compute second partials of c along ray normals
 
@@ -102,6 +104,8 @@ CONTAINS
     ! ray2%DetP = ray0%DetP + h / csq1 * ( -cmm1 * ray1%f - cnn1 * ray1%g + 2.0 * cmn1 * ray1%h )
     ! ray2%DetQ = ray0%DetQ + h * c1 * ( ray1%f + ray1%g )
 
+    ! LP: BUG: ray2%phi only depends on h and ray1 vars, but should depend on
+    ! hw0 & hw1 like the other parameters
     ray2%phi  = ray0%phi  + h * ( 1.0 / c1 ) * ray1%t( 3 ) * &
          ( ray1%t( 2 ) * gradc1( 1 ) - ray1%t( 1 ) * gradc1( 2 ) ) / &
          ( ray1%t( 1 ) ** 2 + ray1%t( 2 ) ** 2 )
@@ -136,9 +140,9 @@ CONTAINS
        IF ( iSegz /= iSegz0 ) THEN
           nBdry = [ 0D0, 0D0, -SIGN( 1.0D0, ray2%t( 3 ) ) ]   ! inward normal to layer
        ELSE IF ( iSegx /= iSegx0 ) THEN
-          nBdry = [ -SIGN( 1.0D0, ray2%t( 1 ) ), 0D0, 0D0 ]   ! inward normal to x-sgement
+          nBdry = [ -SIGN( 1.0D0, ray2%t( 1 ) ), 0D0, 0D0 ]   ! inward normal to x-segment
        ELSE
-          nBdry = [ 0D0, -SIGN( 1.0D0, ray2%t( 2 ) ), 0D0 ]   ! inward normal to y-sgement
+          nBdry = [ 0D0, -SIGN( 1.0D0, ray2%t( 2 ) ), 0D0 ]   ! inward normal to y-segment
        END IF
        CALL CurvatureCorrection
 
@@ -261,7 +265,7 @@ CONTAINS
     ! top crossing
     h2 = huge( h2 )
     d  = x - Topx              ! vector from top to ray
-    IF ( DOT_PRODUCT( Topn, d )  > EPSILON( h1 ) ) THEN
+    IF ( DOT_PRODUCT( Topn, d )  > EPSILON( h1 ) ) THEN ! LP: TODO: change here from 2D
        d0 = x0 - Topx   ! vector from top    node to ray origin
        h2 = -DOT_PRODUCT( d0, Topn ) / DOT_PRODUCT( urayt, Topn )
        ! write( *, * ) 'top crossing'
@@ -270,7 +274,7 @@ CONTAINS
     ! bottom crossing
     h3 = huge( h3 )
     d  = x - Botx              ! vector from bottom to ray
-    IF ( DOT_PRODUCT( Botn, d ) > EPSILON( h1 ) ) THEN
+    IF ( DOT_PRODUCT( Botn, d ) > EPSILON( h1 ) ) THEN ! LP: TODO: change here from 2D
        d0 = x0 - Botx   ! vector from bottom node to ray origin
        h3 = -DOT_PRODUCT( d0, Botn ) / DOT_PRODUCT( urayt, Botn )
        ! write( *, * ) 'bottom crossing'
@@ -306,6 +310,7 @@ CONTAINS
        ySeg( 2 ) = MIN( ySeg( 2 ), SSP%Seg%y( iSegy0 + 1 ) )
     END IF
 
+    ! LP: TODO: not doing this 1000
     IF ( ABS( urayt( 2 ) ) > 1000.0 * EPSILON( h1 ) ) THEN   !!! why 1000.0 here and not for x-crossing?
        IF       ( x(  2 ) < ySeg( 1 ) ) THEN
           h5 = -( x0( 2 ) - ySeg( 1 ) ) / urayt( 2 )
@@ -342,6 +347,7 @@ CONTAINS
 
     h = MIN( h, h1, h2, h3, h4, h5, h6, h7 )  ! take limit set by shortest distance to a crossing
 
+    ! LP: TODO: changed in 2D
     IF ( h < 1.0d-4 * Beam%deltas ) THEN        ! is it taking an infinitesimal step?
        h = 1.0d-5 * Beam%deltas                 ! make sure we make some motion
        iSmallStepCtr = iSmallStepCtr + 1   ! keep a count of the number of sequential small steps

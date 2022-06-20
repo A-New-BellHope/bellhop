@@ -666,7 +666,7 @@ SUBROUTINE Reflect2D( is, HS, BotTop, tBdry, nBdry, kappa, RefC, Npts )
   RN = 2 * kappa / c ** 2 / Th    ! boundary curvature correction
 
   ! get the jumps (this could be simplified, e.g. jump in rayt is roughly 2 * Th * nbdry
-  cnjump = -DOT_PRODUCT( gradc, rayn_tilde - rayn  )
+  cnjump = -DOT_PRODUCT( gradc, rayn_tilde - rayn )
   csjump = -DOT_PRODUCT( gradc, rayt_tilde - rayt )
 
   IF ( BotTop == 'TOP' ) THEN
@@ -708,7 +708,7 @@ SUBROUTINE Reflect2D( is, HS, BotTop, tBdry, nBdry, kappa, RefC, Npts )
      kx = omega * Tg     ! wavenumber in direction parallel      to bathymetry
      kz = omega * Th     ! wavenumber in direction perpendicular to bathymetry (in ocean)
 
-     ! notation below is a bit mis-leading
+     ! notation below is a bit misleading
      ! kzS, kzP is really what I called gamma in other codes, and differs by a factor of +/- i
      IF ( REAL( HS%cS ) > 0.0 ) THEN
         kzS2 = kx ** 2 - ( omega / HS%cS ) ** 2

@@ -208,6 +208,7 @@ SUBROUTINE BellhopCore
            tdummy = [ 0.0, 0.0, 1.0 ]
            CALL EvaluateSSP3D( xs, tdummy, c0, cimag0, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
            ray2D( 1 )%c = c0
+           ray3D( 1 )%c = c0
            CALL PickEpsilon( Beam%Type( 1 : 2 ), omega, c0, Angles%Dalpha, Angles%Dbeta, Beam%rLoop, Beam%epsMultiplier, epsilon ) ! beam constant
 
            ! *** Trace successive beams ***
@@ -479,7 +480,7 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
   REAL     (KIND=8), INTENT( IN ) :: xs( 3 )     ! x-y-z coordinate of the source
   INTEGER           :: is, is1                   ! index for a step along the ray
   REAL     (KIND=8) :: x( 3 )                    ! ray coordinate
-  REAL     (KIND=8) :: c, cimag, gradc( 2 ), crr, crz, czz, rho
+  !REAL     (KIND=8) :: c, cimag, gradc( 2 ), crr, crz, czz, rho
   REAL     (KIND=8) :: DistBegTop, DistEndTop, DistBegBot, DistEndBot ! Distances from ray beginning, end to top and bottom
   REAL     (KIND=8) :: tinit( 2 ), tradial( 2 ), BotnInt( 3 ), TopnInt( 3 ), s1, s2
   REAL     (KIND=8) :: z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy
@@ -491,8 +492,8 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
   tradial = [ COS( beta ), SIN( beta ) ]
   ray2D( 1 )%x = [ 0.0D0, xs( 3 ) ]
 
-  CALL EvaluateSSP2D( ray2D( 1 )%x, tinit, c, cimag, gradc, crr, crz, czz, rho, xs, tradial, freq )
-  ray2D( 1 )%t         = tinit / c
+  ! CALL EvaluateSSP2D( ray2D( 1 )%x, tinit, c, cimag, gradc, crr, crz, czz, rho, xs, tradial, freq )
+  ray2D( 1 )%t         = tinit / ray2D( 1 )%c ! LP: Set before PickEpsilon independent of ray angles; never overwritten
   ray2D( 1 )%p         = [ 1.0, 0.0 ]
   ray2D( 1 )%q         = [ 0.0, 1.0 ]
   ray2D( 1 )%tau       = 0.0
@@ -545,6 +546,7 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
      IF      ( DistBegTop > 0.0d0 .AND. DistEndTop <= 0.0d0 ) THEN  ! test top reflection
         IF ( atiType == 'C' ) THEN
 
+           ! LP: This is superfluous, it's the same x calculated above.
            x = [ xs( 1 ) + ray2D( is + 1 )%x( 1 ) * tradial( 1 ),   &
                  xs( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
                            ray2D( is + 1 )%x( 2 ) ]
@@ -775,8 +777,8 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
   REAL     ( KIND=8 ), INTENT( IN ) :: alpha, beta    ! take-off angles of the ray
   COMPLEX  ( KIND=8 ), INTENT( IN ) :: epsilon( 2 )   ! beam initial conditions
   INTEGER             :: is, is1
-  REAL     ( KIND=8 ) :: DistBegTop, DistEndTop, DistBegBot, DistEndBot, &
-                         c, cimag, gradc( 3 ), cxx, cyy, czz, cxy, cxz, cyz, rho   ! soundspeed derivatives
+  REAL     ( KIND=8 ) :: DistBegTop, DistEndTop, DistBegBot, DistEndBot!, &
+                         !c, cimag, gradc( 3 ), cxx, cyy, czz, cxy, cxz, cyz, rho   ! soundspeed derivatives
   REAL     (KIND=8) :: TopnInt( 3 ), BotnInt( 3 )
   REAL     (KIND=8) :: s1, s2
   REAL     (KIND=8) :: z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy
@@ -787,15 +789,15 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
   iSmallStepCtr = 0
   ray3D( 1 )%x    = xs
   tinit = [ COS( alpha ) * COS( beta ), COS( alpha ) * SIN( beta ), SIN( alpha ) ]
-  CALL EvaluateSSP3D(  ray3D( 1 )%x, ray3D( 1 )%t, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
+  !CALL EvaluateSSP3D(  ray3D( 1 )%x, tinit, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
 
-  ray3D( 1 )%t    = tinit / c
+  ray3D( 1 )%t    = tinit / ray3D( 1 )%c ! LP: Set before PickEpsilon independent of ray angles; never overwritten
   !ray3D( 1 )%f    = epsilon( 2 )
   !ray3D( 1 )%g    = epsilon( 1 )
   !ray3D( 1 )%h    = 0.0
   !ray3D( 1 )%DetP = 1.0
   !ray3D( 1 )%DetQ = epsilon( 1 ) * epsilon( 2 )
-  ray3D( 1 )%c    = c
+  !ray3D( 1 )%c    = c   ! LP
   ray3D( 1 )%phi  = 0.0
 
   ray3D( 1 )%tau       = 0.0

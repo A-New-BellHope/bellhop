@@ -154,6 +154,7 @@ CONTAINS
              cco = co * co
              ssi = si * si
 
+             ! LP: BUG: Missing divide by 0 check on si from 2D version.
              delta   = a * co / si / ( ck * sb * d )    
              pdelta  = real( delta ) / ( ray2D( is )%c / co)
              ddelta  = -a / ( ck*sb*d ) - a*cco / ssi / (ck*sb*d) + a*cco / (ck*b*sb*d) &

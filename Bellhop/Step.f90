@@ -26,12 +26,12 @@ CONTAINS
          h, halfh, ray2n( 2 ), RM, RN, gradcjump( 2 ), cnjump, csjump, w0, w1, rho 
     REAL (KIND=8 ) :: urayt2( 2 ), unitdt( 2 ), unitdp( 2 ), unitdq( 2 )
     COMPLEX (KIND=8 ) :: unitdtau
-         
+    
     ! WRITE( PRTFile, * )
     ! WRITE( PRTFile, * ) 'ray0 x t p q tau amp', ray0%x, ray0%t, ray0%p, ray0%q, ray0%tau, ray0%Amp
     ! WRITE( PRTFile, * ) 'iSegz iSegr', iSegz, iSegr
     
-    ! IF ( ray0%x( 1 ) > 420.0 ) THEN
+    ! IF ( ray0%x( 1 ) > 16800.0 ) THEN
     !    STOP 'Enough'
     ! END IF
 
@@ -59,7 +59,7 @@ CONTAINS
     ray1%t = ray0%t - halfh * gradc0 / csq0
     ray1%p = ray0%p - halfh * cnn0_csq0 * ray0%q
     ray1%q = ray0%q + halfh * c0        * ray0%p
-
+    
     ! WRITE( PRTFile, * ) 'ray1 x t p q', ray1%x, ray1%t, ray1%p, ray1%q
 
     ! *** Phase 2
