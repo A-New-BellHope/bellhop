@@ -4,6 +4,9 @@ MODULE Step3DMod
   USE Bdry3DMod
   USE sspMod
   IMPLICIT NONE
+  
+  REAL (KIND=8), PARAMETER, PRIVATE :: INFINITESIMAL_STEP_SIZE = 1.0d-6
+  
 CONTAINS
 
   SUBROUTINE Step3D( ray0, ray2 )
@@ -21,14 +24,21 @@ CONTAINS
     REAL  (KIND=8 ) :: gradc0( 3 ), gradc1( 3 ), gradc2( 3 ), &
          c0, cimag0, csq0, cxx0, cyy0, czz0, cxy0, cxz0, cyz0, cnn0, cmn0, cmm0, &
          c1, cimag1, csq1, cxx1, cyy1, czz1, cxy1, cxz1, cyz1, cnn1, cmn1, cmm1, &
-         c2, cimag2,       cxx2, cyy2, czz2, cxy2, cxz2, cyz2, c_mat0( 2, 2 ), c_mat1( 2, 2 ), &
+         c2, cimag2,       cxx2, cyy2, czz2, cxy2, cxz2, cyz2, c_mat1( 2, 2 ), &
          urayt0( 3 ), urayt1( 3 ), h, halfh, hw0, hw1, w0, w1, rho
+    COMPLEX( KIND=8 ) :: d_phi0, d_phi1
+    REAL  (KIND=8 ) :: d_p_tilde0( 2 ), d_p_hat0( 2 ), d_q_tilde0( 2 ), d_q_hat0( 2 ), &
+                       d_p_tilde1( 2 ), d_p_hat1( 2 ), d_q_tilde1( 2 ), d_q_hat1( 2 )
     REAL  (KIND=8 ) :: gradcjump( 3 ), csjump, cn1jump, cn2jump, tBdry( 3 ), nBdry( 3 ), RM, R1, R2, Tg, Th, &
          rayt( 3 ), rayn1( 3 ), rayn2( 3 )
     REAL  (KIND=8 ) :: e1( 3 ), e2( 3 )                              ! ray normals for ray-centered coordinates
     REAL  (KIND=8 ) :: p_tilde_in(  2 ), p_hat_in(  2 ), q_tilde_in(  2 ), q_hat_in(  2 ), &
          p_tilde_out( 2 ), p_hat_out( 2 ), RotMat( 2, 2 )
-
+         
+    ! WRITE( PRTFile, * )
+    ! WRITE( PRTFile, * ) 'ray0 x t tau amp', ray0%x, ray0%t, ray0%tau, ray0%Amp
+    ! WRITE( PRTFile, * ) 'iSegx0 iSegy0 iSegz0', iSegz, iSegr
+           
     ! The numerical integrator used here is a version of the polygon (a.k.a. midpoint, leapfrog, or Box method), and similar
     ! to the Heun (second order Runge-Kutta method).
     ! However, it's modified to allow for a dynamic step change, while preserving the second-order accuracy).
@@ -38,50 +48,32 @@ CONTAINS
     CALL EvaluateSSP3D( ray0%x, ray0%t, c0, cimag0, gradc0, cxx0, cyy0, czz0, cxy0, cxz0, cyz0, rho, freq, 'TAB' )
     CALL RayNormal( ray0%t, ray0%phi, c0, e1, e2 ) ! Compute ray normals e1 and e2
     CALL Get_c_partials( cxx0, cxy0, cxz0, cyy0, cyz0, czz0, e1, e2, cnn0, cmn0, cmm0 ) ! Compute second partials of c along ray normals
+    CALL ComputeDeltaPQ( ray0, c0, gradc0, cnn0, cmn0, cmm0, d_phi0, d_p_tilde0, d_p_hat0, d_q_tilde0, d_q_hat0)
 
-    csq0   = c0 * c0
 
     iSegx0 = iSegx     ! make note of current layer
     iSegy0 = iSegy
     iSegz0 = iSegz
 
-    h = Beam%deltas       ! initially set the step h, to the basic one, deltas
+    csq0   = c0 * c0
     urayt0 = c0 * ray0%t  ! unit tangent
+    h = Beam%deltas       ! initially set the step h, to the basic one, deltas
 
     CALL ReduceStep3D( ray0%x, urayt0, iSegx0, iSegy0, iSegz0, h ) ! reduce h to land on boundary
-
     halfh = 0.5 * h       ! first step of the modified polygon method is a half step
 
     ray1%x = ray0%x    + halfh * urayt0
     ray1%t = ray0%t    - halfh * gradc0 / csq0
-
-    ! ray1%f    = ray0%f    + halfh * ( c0 * ray0%DetP - cnn0 / csq0 * ray0%DetQ )
-    ! ray1%g    = ray0%g    + halfh * ( c0 * ray0%DetP - cmm0 / csq0 * ray0%DetQ )
-    ! ray1%h    = ray0%h    + halfh * (                - cmn0 / csq0 * ray0%DetQ )
-    ! ray1%DetP = ray0%DetP + halfh / csq0 * ( -cmm0 * ray0%f - cnn0 * ray0%g + 2.0 * cmn0 * ray0%h )
-    ! ray1%DetQ = ray0%DetQ + halfh * c0 * ( ray0%f + ray0%g )
-
-    ray1%phi  = ray0%phi  + halfh * ( 1.0 / c0 ) * ray0%t( 3 ) * &
-         ( ray0%t( 2 ) * gradc0( 1 ) - ray0%t( 1 ) * gradc0( 2 ) ) / &
-         ( ray0%t( 1 ) ** 2 + ray0%t( 2 ) ** 2 )
-
-    c_mat0( 1, : ) = -[ cnn0, cmn0 ] / csq0
-    c_mat0( 2, : ) = -[ cmn0, cmm0 ] / csq0
-
-    ray1%p_tilde = ray0%p_tilde + halfh * MATMUL( c_mat0, ray0%q_tilde )
-    ray1%q_tilde = ray0%q_tilde + halfh *         c0    * ray0%p_tilde 
-
-    ray1%p_hat   = ray0%p_hat   + halfh * MATMUL( c_mat0, ray0%q_hat )
-    ray1%q_hat   = ray0%q_hat   + halfh *         c0    * ray0%p_hat 
+    CALL UpdateRayPQ ( ray1, ray0, halfh, d_phi0, d_p_tilde0, d_p_hat0, d_q_tilde0, d_q_hat0 )
 
     ! *** Phase 2
 
     CALL EvaluateSSP3D( ray1%x, ray1%t, c1, cimag1, gradc1, cxx1, cyy1, czz1, cxy1, cxz1, cyz1, rho, freq, 'TAB' )
-    rayt = c1 * ray1%t           ! unit tangent to ray
-    ! LP: BUG: should be ray1%phi; ray2%phi would be uninitialized memory or
+    ! LP: Fixed; should be ray1%phi; ray2%phi would be uninitialized memory or
     ! left over from the previous ray
-    CALL RayNormal_unit( rayt, ray2%phi, e1, e2 )
+    CALL RayNormal( ray1%t, ray1%phi, c1, e1, e2 )
     CALL Get_c_partials( cxx1, cxy1, cxz1, cyy1, cyz1, czz1, e1, e2, cnn1, cmn1, cmm1 ) ! Compute second partials of c along ray normals
+    CALL ComputeDeltaPQ( ray1, c1, gradc1, cnn1, cmn1, cmm1, d_phi1, d_p_tilde1, d_p_hat1, d_q_tilde1, d_q_hat1)
 
     csq1   = c1 * c1
     urayt1 = c1 * ray1%t   ! unit tangent
@@ -91,38 +83,26 @@ CONTAINS
     ! use blend of f' based on proportion of a full step used.
     w1  = h / ( 2.0d0 * halfh )
     w0  = 1.0d0 - w1
+    urayt2 = w0 * urayt0 + w1 * urayt1
+    ! Take the blended ray tangent ( urayt2 ) and find the minimum step size ( h )
+    ! to put this on a boundary, and ensure that the resulting position
+    ! ( ray2%x ) gets put precisely on the boundary.
+    CALL StepToBdry3D( ray0%x, ray2%x, urayt2, iSegx0, iSegy0, iSegz0, h, topRefl, botRefl )
+    
+    ! Update other variables with this new h
+    ! LP: Fixed: ray2%phi now depends on hw0 & hw1 like the other parameters,
+    ! originally only depended on h and ray1 vars
     hw0 = h * w0
     hw1 = h * w1
-
-    ray2%x = ray0%x    + hw0 * urayt0        + hw1 * urayt1
-    ray2%t = ray0%t    - hw0 * gradc0 / csq0 - hw1 * gradc1 / csq1
-
-    ! ERROR: need to do hw0 and hw1 blend here as well !!!
-    ! ray2%f    = ray0%f    + h * ( c1 * ray1%DetP - cnn1 / csq1 * ray1%DetQ )
-    ! ray2%g    = ray0%g    + h * ( c1 * ray1%DetP - cmm1 / csq1 * ray1%DetQ )
-    ! ray2%h    = ray0%h    + h * (                - cmn1 / csq1 * ray1%DetQ )
-    ! ray2%DetP = ray0%DetP + h / csq1 * ( -cmm1 * ray1%f - cnn1 * ray1%g + 2.0 * cmn1 * ray1%h )
-    ! ray2%DetQ = ray0%DetQ + h * c1 * ( ray1%f + ray1%g )
-
-    ! LP: BUG: ray2%phi only depends on h and ray1 vars, but should depend on
-    ! hw0 & hw1 like the other parameters
-    ray2%phi  = ray0%phi  + h * ( 1.0 / c1 ) * ray1%t( 3 ) * &
-         ( ray1%t( 2 ) * gradc1( 1 ) - ray1%t( 1 ) * gradc1( 2 ) ) / &
-         ( ray1%t( 1 ) ** 2 + ray1%t( 2 ) ** 2 )
-    ray2%tau  = ray0%tau + hw0 / CMPLX( c0, cimag0, KIND=8 ) + hw1 / CMPLX( c1, cimag1, KIND=8 )
+    ray2%t   = ray0%t   - hw0 * gradc0 / csq0 - hw1 * gradc1 / csq1
+    ray2%tau = ray0%tau + hw0 / CMPLX( c0, cimag0, KIND=8 ) + hw1 / CMPLX( c1, cimag1, KIND=8 )
+    CALL UpdateRayPQ ( ray2, ray0, hw0, d_phi0, d_p_tilde0, d_p_hat0, d_q_tilde0, d_q_hat0 )
+    CALL UpdateRayPQ ( ray2, ray2, hw1, d_phi1, d_p_tilde1, d_p_hat1, d_q_tilde1, d_q_hat1 ) ! Not a typo, accumulating into 2
 
     ray2%Amp       = ray0%Amp
     ray2%Phase     = ray0%Phase
     ray2%NumTopBnc = ray0%NumTopBnc
     ray2%NumBotBnc = ray0%NumBotBnc
-
-    c_mat1( 1, : ) = -[ cnn1, cmn1 ] / csq1
-    c_mat1( 2, : ) = -[ cmn1, cmm1 ] / csq1
-
-    ray2%p_tilde = ray0%p_tilde + hw0 * MATMUL( c_mat0, ray0%q_tilde ) + hw1 * MATMUL( c_mat1, ray1%q_tilde )
-    ray2%q_tilde = ray0%q_tilde + hw0 *         c0    * ray0%p_tilde   + hw1 *         c1    * ray1%p_tilde
-    ray2%p_hat   = ray0%p_hat   + hw0 * MATMUL( c_mat0, ray0%q_hat   ) + hw1 * MATMUL( c_mat1, ray1%q_hat )
-    ray2%q_hat   = ray0%q_hat   + hw0 *         c0    * ray0%p_hat     + hw1 *         c1    * ray1%p_hat 
 
     ! *** If we crossed an interface, apply jump condition ***
 
@@ -228,6 +208,56 @@ CONTAINS
       RETURN
     END SUBROUTINE Get_c_partials
   END SUBROUTINE Step3D
+  
+  SUBROUTINE ComputeDeltaPQ( ray, c, gradc, cnn, cmn, cmm, d_phi, d_p_tilde, d_p_hat, d_q_tilde, d_q_hat )
+    TYPE(    ray3DPt ), INTENT( IN )  :: ray
+    REAL(    KIND=8  ), INTENT( IN )  :: c, gradc( 3 ), cnn, cmn, cmm
+    COMPLEX( KIND=8  ), INTENT( OUT ) :: d_phi
+    REAL(    KIND=8  ), INTENT( OUT ) :: d_p_tilde( 2 ), d_p_hat( 2 ), d_q_tilde( 2 ), d_q_hat( 2 )
+    REAL(    KIND=8  )                :: c_mat( 2, 2 ), csq
+    
+    d_phi = ( 1.0 / c ) * ray%t( 3 ) * &
+         ( ray%t( 2 ) * gradc( 1 ) - ray%t( 1 ) * gradc( 2 ) ) / &
+         ( ray%t( 1 ) ** 2 + ray%t( 2 ) ** 2 )
+    
+    csq = c ** 2
+    c_mat( 1, : ) = -[ cnn, cmn ] / csq
+    c_mat( 2, : ) = -[ cmn, cmm ] / csq
+    
+    d_p_tilde = MATMUL( c_mat, ray%q_tilde )
+    d_p_hat   = MATMUL( c_mat, ray%q_hat )
+
+    d_q_tilde =         c    * ray%p_tilde 
+    d_q_hat   =         c    * ray%p_hat 
+    
+    ! d_f    = ( c0 * ray0%DetP - cnn0 / csq0 * ray0%DetQ )
+    ! d_g    = ( c0 * ray0%DetP - cmm0 / csq0 * ray0%DetQ )
+    ! d_h    = (                - cmn0 / csq0 * ray0%DetQ )
+    ! d_DetP = 1.0D0 / csq0 * ( -cmm0 * ray0%f - cnn0 * ray0%g + 2.0 * cmn0 * ray0%h )
+    ! d_DetQ = c0 * ( ray0%f + ray0%g )
+    
+  END SUBROUTINE ComputeDeltaPQ
+  
+  SUBROUTINE UpdateRayPQ ( ray1, ray0, h, d_phi, d_p_tilde, d_p_hat, d_q_tilde, d_q_hat )
+    TYPE(    ray3DPt ), INTENT( INOUT ) :: ray1
+    TYPE(    ray3DPt ), INTENT( IN ) :: ray0
+    COMPLEX( KIND=8  ), INTENT( IN ) :: d_phi
+    REAL(    KIND=8  ), INTENT( IN ) :: d_p_tilde( 2 ), d_p_hat( 2 ), d_q_tilde( 2 ), d_q_hat( 2 )
+    
+    ray1%phi = ray0%phi + h * d_phi
+    ray1%p_tilde = ray0%p_tilde + h * d_p_tilde
+    ray1%q_tilde = ray0%q_tilde + h * d_q_tilde 
+    ray1%p_hat   = ray0%p_hat   + h * d_p_hat
+    ray1%q_hat   = ray0%q_hat   + h * d_q_hat 
+    
+    ! LP: no longer missing the hw0 / hw1 blend
+    ! ray1%f    = ray0%f    + h * d_f
+    ! ray1%g    = ray0%g    + h * d_g
+    ! ray1%h    = ray0%h    + h * d_h
+    ! ray1%DetP = ray0%DetP + h * d_DetP
+    ! ray1%DetQ = ray0%DetQ + h * d_DetQ
+
+  END SUBROUTINE UpdateRayPQ
 
   ! **********************************************************************!
 
@@ -265,7 +295,9 @@ CONTAINS
     ! top crossing
     h2 = huge( h2 )
     d  = x - Topx              ! vector from top to ray
-    IF ( DOT_PRODUCT( Topn, d )  > EPSILON( h1 ) ) THEN ! LP: TODO: change here from 2D
+    ! LP: Changed from EPSILON( h1 ) (should have been h2!) to 0 in conjunction 
+    ! with StepToBdry3D change here.
+    IF ( DOT_PRODUCT( Topn, d )  >= 0.0D0 ) THEN
        d0 = x0 - Topx   ! vector from top    node to ray origin
        h2 = -DOT_PRODUCT( d0, Topn ) / DOT_PRODUCT( urayt, Topn )
        ! write( *, * ) 'top crossing'
@@ -274,7 +306,9 @@ CONTAINS
     ! bottom crossing
     h3 = huge( h3 )
     d  = x - Botx              ! vector from bottom to ray
-    IF ( DOT_PRODUCT( Botn, d ) > EPSILON( h1 ) ) THEN ! LP: TODO: change here from 2D
+    ! LP: Changed from EPSILON( h1 ) (should have been h3!) to 0 in conjunction 
+    ! with StepToBdry3D change here.
+    IF ( DOT_PRODUCT( Botn, d ) >= 0.0D0 ) THEN
        d0 = x0 - Botx   ! vector from bottom node to ray origin
        h3 = -DOT_PRODUCT( d0, Botn ) / DOT_PRODUCT( urayt, Botn )
        ! write( *, * ) 'bottom crossing'
@@ -310,8 +344,8 @@ CONTAINS
        ySeg( 2 ) = MIN( ySeg( 2 ), SSP%Seg%y( iSegy0 + 1 ) )
     END IF
 
-    ! LP: TODO: not doing this 1000
-    IF ( ABS( urayt( 2 ) ) > 1000.0 * EPSILON( h1 ) ) THEN   !!! why 1000.0 here and not for x-crossing?
+    ! LP: removed 1000 * epsilon which mbp had comment questioning also
+    IF ( ABS( urayt( 2 ) ) > EPSILON( h1 ) ) THEN
        IF       ( x(  2 ) < ySeg( 1 ) ) THEN
           h5 = -( x0( 2 ) - ySeg( 1 ) ) / urayt( 2 )
           ! write( *, * ) 'segment crossing in y'
@@ -327,8 +361,7 @@ CONTAINS
     d0    = x0 - Topx   ! vector from bottom node to ray origin
     tri_n = [ -Top_deltay, Top_deltax, 0.0d0 ]
 
-    IF ( ( DOT_PRODUCT( tri_n, d0 ) > 0.0d0 .AND. DOT_PRODUCT( tri_n, d ) <= 0.0d0 ) .OR. &
-         ( DOT_PRODUCT( tri_n, d0 ) < 0.0d0 .AND. DOT_PRODUCT( tri_n, d ) >= 0.0d0 )  ) THEN
+    IF ( CheckDiagCrossing( tri_n, d0, d ) ) THEN
        h6 = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
        ! write( *, * ) 'diagonal crossing'
     END IF
@@ -339,21 +372,218 @@ CONTAINS
     d0    = x0 - Botx   ! vector from bottom node to ray origin
     tri_n = [ -Bot_deltay, Bot_deltax, 0.0d0 ]
 
-    IF ( ( DOT_PRODUCT( tri_n, d0 ) > 0.0d0 .AND. DOT_PRODUCT( tri_n, d ) <= 0.0d0 ) .OR. &
-         ( DOT_PRODUCT( tri_n, d0 ) < 0.0d0 .AND. DOT_PRODUCT( tri_n, d ) >= 0.0d0 )  ) THEN
+    IF ( CheckDiagCrossing( tri_n, d0, d ) ) THEN
        h7 = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
        ! write( *, * ) 'diagonal crossing'
     END IF
 
     h = MIN( h, h1, h2, h3, h4, h5, h6, h7 )  ! take limit set by shortest distance to a crossing
 
-    ! LP: TODO: changed in 2D
-    IF ( h < 1.0d-4 * Beam%deltas ) THEN        ! is it taking an infinitesimal step?
-       h = 1.0d-5 * Beam%deltas                 ! make sure we make some motion
+    IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN        ! is it taking an infinitesimal step?
+       h = INFINITESIMAL_STEP_SIZE * Beam%deltas                 ! make sure we make some motion
        iSmallStepCtr = iSmallStepCtr + 1   ! keep a count of the number of sequential small steps
     ELSE
        iSmallStepCtr = 0                   ! didn't do a small step so reset the counter
     END IF
   END SUBROUTINE ReduceStep3D
+  
+  ! **********************************************************************!
+
+  SUBROUTINE StepToBdry3D( x0, x2, urayt, iSegx0, iSegy0, iSegz0, h, topRefl, botRefl )
+
+    INTEGER,       INTENT( IN    ) :: iSegx0, iSegy0, iSegz0
+    REAL (KIND=8), INTENT( IN    ) :: x0( 3 ), urayt( 3 )  ! ray coordinate and tangent
+    REAL (KIND=8), INTENT( INOUT ) :: x2( 3 ), h           ! output coord, reduced step size
+    LOGICAL,       INTENT( OUT   ) :: topRefl, botRefl
+    REAL (KIND=8) :: d( 3 ), d0( 3 ), tri_n( 3 )
+    REAL (KIND=8) :: xSeg( 2 ), ySeg( 2 )                  ! boundary limits
+    INTEGER                        :: k
+
+    ! Original step due to maximum step size
+    h = Beam%deltas
+    x2 = x0 + h * urayt
+
+    ! interface crossing in depth
+    IF ( ABS( urayt( 3 ) ) > EPSILON( h1 ) ) THEN
+       IF      ( SSP%z( iSegz0     ) > x(  3 ) .AND. iSegz0     > 1  ) THEN
+          h  = ( SSP%z( iSegz0     ) - x0( 3 ) ) / urayt( 3 )
+          x2 = x0 + h * urayt
+          x2( 3 ) = SSP%z( iSegz0 )
+          ! WRITE( PRTFile, * ) 'StepToBdry3D shallower h to', h, x2
+       ELSE IF ( SSP%z( iSegz0 + 1 ) < x(  3 ) .AND. iSegz0 + 1 < SSP%Nz ) THEN
+          h  = ( SSP%z( iSegz0 + 1 ) - x0( 3 ) ) / urayt( 3 )
+          x2 = x0 + h * urayt
+          x2( 3 ) = SSP%z( iSegz0 + 1 )
+          ! WRITE( PRTFile, * ) 'StepToBdry3D deeper h to', h, x2
+       END IF
+    END IF
+
+    ! top crossing
+    d  = x2 - Topx ! vector from top to ray
+    d0 = x0 - Topx ! vector from top node to ray origin
+    ! LP: Originally, this value had to be > a small positive number, meaning the
+    ! new step really had to be outside the boundary, not just to the boundary.
+    ! Also, this is not missing a normalization factor, Topn is normalized so
+    ! this is actually the distance above the top in meters.
+    IF ( DOT_PRODUCT( Topn, d )  > -INFINITESIMAL_STEP_SIZE ) THEN
+       d0 = x0 - Topx   ! vector from top    node to ray origin
+       h  = -DOT_PRODUCT( d0, Topn ) / DOT_PRODUCT( urayt, Topn )
+       x2 = x0 + h * urayt
+       ! Snap to exact top depth value if it's flat
+       IF ( ABS( Topn( 1 ) ) < EPSILON( Topn( 1 ) ) .AND. ABS( Topn( 2 ) ) < EPSILON( Topn( 2 ) ) ) THEN
+          x2( 3 ) = Topx( 3 )
+       END IF
+       ! WRITE( PRTFile, * ) 'StepToBdry3D top crossing h to', h, x2
+       topRefl = .TRUE.
+    ELSE
+       topRefl = .FALSE.
+    END IF
+
+    ! bottom crossing
+    d  = x2 - Botx ! vector from bottom to ray
+    d0 = x0 - Botx ! vector from bottom node to ray origin
+    ! LP: See comment above for top case.
+    IF ( DOT_PRODUCT( Botn, d ) > -INFINITESIMAL_STEP_SIZE ) THEN
+       d0 = x0 - Botx   ! vector from bottom node to ray origin
+       h  = -DOT_PRODUCT( d0, Botn ) / DOT_PRODUCT( urayt, Botn )
+       x2 = x0 + h * urayt
+       ! Snap to exact bottom depth value if it's flat
+       IF ( ABS( Botn( 1 ) ) < EPSILON( Botn( 1 ) ) .AND. ABS( Botn( 2 ) ) < EPSILON( Botn( 2 ) ) ) THEN
+          x2( 3 ) = Botx( 3 )
+       END IF
+       ! WRITE( PRTFile, * ) 'StepToBdry3D bottom crossing h to', h, x2
+       botRefl = .TRUE.
+       ! Should not ever be able to cross both, but in case it does, make sure
+       ! only the crossing we exactly landed on is active
+       topRefl = .FALSE.
+    ELSE
+       botRefl = .FALSE.
+    END IF
+
+    ! top/bottom segment crossing in x
+    xSeg( 1 ) = MAX( xTopSeg( 1 ), xBotSeg( 1 ) ) ! LP: lower range bound (not an x value)
+    xSeg( 2 ) = MIN( xTopSeg( 2 ), xBotSeg( 2 ) ) ! LP: upper range bound (not a y value)
+    
+    IF ( SSP%Type == 'H' ) THEN   ! ocean segment
+       xSeg( 1 ) = MAX( xSeg( 1 ), SSP%Seg%x( iSegx0     ) )
+       xSeg( 2 ) = MIN( xSeg( 2 ), SSP%Seg%x( iSegx0 + 1 ) )
+    END IF
+
+    IF ( ABS( urayt( 1 ) ) > EPSILON( h1 ) ) THEN
+       IF       ( x(  1 ) < xSeg( 1 ) ) THEN
+          h  = -( x0( 1 ) - xSeg( 1 ) ) / urayt( 1 )
+          x2 = x0 + h * urayt
+          x2( 1 ) = xSeg( 1 )
+          topRefl = .FALSE.
+          botRefl = .FALSE.
+          ! WRITE( PRTFile, * ) 'StepToBdry3D X min bound h to', h, x2
+       ELSE IF  ( x(  1 ) > xSeg( 2 ) ) THEN
+          h  = -( x0( 1 ) - xSeg( 2 ) ) / urayt( 1 )
+          x2 = x0 + h * urayt
+          x2( 1 ) = xSeg( 2 )
+          topRefl = .FALSE.
+          botRefl = .FALSE.
+          ! WRITE( PRTFile, * ) 'StepToBdry3D X max bound h to', h, x2
+       END IF
+    END IF
+
+    ! top/bottom segment crossing in y
+    ySeg( 1 ) = MAX( yTopSeg( 1 ), yBotSeg( 1 ) )
+    ySeg( 2 ) = MIN( yTopSeg( 2 ), yBotSeg( 2 ) )
+
+    IF ( SSP%Type == 'H' ) THEN   ! ocean segment
+       ySeg( 1 ) = MAX( ySeg( 1 ), SSP%Seg%y( iSegy0     ) )
+       ySeg( 2 ) = MIN( ySeg( 2 ), SSP%Seg%y( iSegy0 + 1 ) )
+    END IF
+
+    ! LP: removed 1000 * epsilon which mbp had comment questioning also
+    IF ( ABS( urayt( 2 ) ) > EPSILON( h1 ) ) THEN
+       IF       ( x(  2 ) < ySeg( 1 ) ) THEN
+          h  = -( x0( 2 ) - ySeg( 1 ) ) / urayt( 2 )
+          x2 = x0 + h * urayt
+          x( 1 ) = ySeg( 1 )
+          topRefl = .FALSE.
+          botRefl = .FALSE.
+          ! WRITE( PRTFile, * ) 'StepToBdry3D Y min bound h to', h, x2
+       ELSE IF  ( x(  2 ) > ySeg( 2 ) ) THEN
+          h  = -( x0( 2 ) - ySeg( 2 ) ) / urayt( 2 )
+          x2 = x0 + h * urayt
+          x( 1 ) = ySeg( 2 )
+          topRefl = .FALSE.
+          botRefl = .FALSE.
+          ! WRITE( PRTFile, * ) 'StepToBdry3D Y max bound h to', h, x2
+       END IF
+    END IF
+
+    ! triangle crossing within a top segment
+    d     = x  - Topx   ! vector from bottom node to ray end
+    d0    = x0 - Topx   ! vector from bottom node to ray origin
+    tri_n = [ -Top_deltay, Top_deltax, 0.0d0 ]
+
+    IF ( CheckDiagCrossing( tri_n, d0, d ) ) THEN
+       h  = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
+       EnsureStepOverTriDiagBdry: DO k = 1, 100
+          x2 = x0 + h * urayt
+          ! LP: Since this is not an exact floating-point value to step
+          ! to, make sure we have stepped over the boundary.
+          IF ( CheckDiagCrossing( tri_n, d0, x - Topx ) ) EXIT EnsureStepOverTriDiagBdry
+          ! LP: Slightly increase h if not.
+          h = h * 1.000001
+       END DO EnsureStepOverTriDiagBdry
+       IF ( k >= 100 ) WRITE( PRTFile, * ) 'EnsureStepOverTriDiagBdry did not converge'
+       topRefl = .FALSE.
+       botRefl = .FALSE.
+       ! write( *, * ) 'diagonal crossing'
+    END IF
+
+    ! triangle crossing within a bottom segment
+    d     = x  - Botx   ! vector from bottom node to ray end
+    d0    = x0 - Botx   ! vector from bottom node to ray origin
+    tri_n = [ -Bot_deltay, Bot_deltax, 0.0d0 ]
+
+    IF ( CheckDiagCrossing( tri_n, d0, d ) ) THEN
+       h  = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
+       EnsureStepOverTriDiagBdry: DO k = 1, 100
+          x2 = x0 + h * urayt
+          ! LP: Since this is not an exact floating-point value to step
+          ! to, make sure we have stepped over the boundary.
+          IF ( CheckDiagCrossing( tri_n, d0, x - Botx ) ) EXIT EnsureStepOverTriDiagBdry
+          ! LP: Slightly increase h if not.
+          h = h * 1.000001
+       END DO EnsureStepOverTriDiagBdry
+       IF ( k >= 100 ) WRITE( PRTFile, * ) 'EnsureStepOverTriDiagBdry did not converge'
+       topRefl = .FALSE.
+       botRefl = .FALSE.
+       ! write( *, * ) 'diagonal crossing'
+    END IF
+
+    IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN        ! is it taking an infinitesimal step?
+       h = INFINITESIMAL_STEP_SIZE * Beam%deltas                 ! make sure we make some motion
+       x2 = x0 + h * urayt
+       ! WRITE( PRTFile, * ) 'StepToBdry3D small step forced h to ', h, x2
+       ! Recheck reflection conditions
+       d = x2 - Topx ! vector from top to ray
+       IF ( DOT_PRODUCT( Topn, d ) > EPSILON( d( 1 ) ) ) THEN
+          topRefl = .TRUE.
+       ELSE
+          topRefl = .FALSE.
+       END IF
+       d = x2 - Botx ! vector from bottom to ray
+       IF ( DOT_PRODUCT( Botn, d ) > EPSILON( d( 1 ) ) ) THEN
+          botRefl = .TRUE.
+          topRefl = .FALSE.
+       ELSE
+          botRefl = .FALSE.
+       END IF
+    END IF
+  END SUBROUTINE ReduceStep3D
+
+  LOGICAL FUNCTION CheckDiagCrossing( tri_n, d0, d )
+    REAL (KIND=8), INTENT( IN ) :: d( 3 ), d0( 3 ), tri_n( 3 )
+    
+    CheckDiagCrossing = &
+       ( DOT_PRODUCT( tri_n, d0 ) > 0.0d0 .AND. DOT_PRODUCT( tri_n, d ) <= 0.0d0 ) .OR. &
+       ( DOT_PRODUCT( tri_n, d0 ) < 0.0d0 .AND. DOT_PRODUCT( tri_n, d ) >= 0.0d0 )
+  END FUNCTION
 
 END MODULE Step3DMod

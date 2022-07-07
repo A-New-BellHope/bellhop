@@ -164,7 +164,7 @@ CONTAINS
     h2 = huge( h2 )
     d  = x - Topx              ! vector from top to ray
     ! LP: Changed from EPSILON( h2 ) to 0 in conjunction with StepToBdry2D change here.
-    IF ( DOT_PRODUCT( Topn, d ) > 0.0D0 ) THEN
+    IF ( DOT_PRODUCT( Topn, d ) >= 0.0D0 ) THEN
        d0  = x0 - Topx         ! vector from top    node to ray origin
        h2 = -DOT_PRODUCT( d0, Topn ) / DOT_PRODUCT( urayt, Topn )
     END IF
@@ -174,7 +174,7 @@ CONTAINS
     d  = x - Botx              ! vector from bottom to ray
     ! LP: Changed from EPSILON( h2 ) (should have been h3!) to 0 in conjunction 
     ! with StepToBdry2D change here.
-    IF ( DOT_PRODUCT( Botn, d ) > 0.0D0 ) THEN
+    IF ( DOT_PRODUCT( Botn, d ) >= 0.0D0 ) THEN
        d0  = x0 - Botx         ! vector from bottom node to ray origin
        h3 = -DOT_PRODUCT( d0, Botn ) / DOT_PRODUCT( urayt, Botn )
     END IF
@@ -240,7 +240,7 @@ CONTAINS
 
     ! top crossing
     d = x2 - Topx             ! vector from top to ray
-    ! Originally, this value had to be > a small positive number, meaning the
+    ! LP: Originally, this value had to be > a small positive number, meaning the
     ! new step really had to be outside the boundary, not just to the boundary.
     ! Also, this is not missing a normalization factor, Topn is normalized so
     ! this is actually the distance above the top in meters.
@@ -279,8 +279,8 @@ CONTAINS
     END IF
 
     ! top or bottom segment crossing in range
-    rSeg( 1 ) = MAX( rTopSeg( 1 ), rBotSeg( 1 ) ) ! lower range bound (not an x value)
-    rSeg( 2 ) = MIN( rTopSeg( 2 ), rBotSeg( 2 ) ) ! upper range bound (not a y value)
+    rSeg( 1 ) = MAX( rTopSeg( 1 ), rBotSeg( 1 ) ) ! LP: lower range bound (not an x value)
+    rSeg( 2 ) = MIN( rTopSeg( 2 ), rBotSeg( 2 ) ) ! LP: upper range bound (not a y value)
 
     IF ( SSP%Type == 'Q' ) THEN
        rSeg( 1 ) = MAX( rSeg( 1 ), SSP%Seg%r( iSegr0     ) )
