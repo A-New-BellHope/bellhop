@@ -783,6 +783,7 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
   REAL     (KIND=8) :: s1, s2
   REAL     (KIND=8) :: z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy
   REAL     (KIND=8) :: tinit( 3 )
+  LOGICAL           :: topRefl, botRefl
 
   ! *** Initial conditions ***
 
@@ -839,7 +840,7 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
      is  = is + 1
      is1 = is + 1
 
-     CALL Step3D( ray3D( is ), ray3D( is1 ) )
+     CALL Step3D( ray3D( is ), ray3D( is1 ), topRefl, botRefl )
      CALL GetTopSeg3D( ray3D( is1 )%x )   ! identify the top    segment above the source
      CALL GetBotSeg3D( ray3D( is1 )%x )   ! identify the bottom segment below the source
 
@@ -856,7 +857,7 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
   
      CALL Distances3D( ray3D( is1 )%x, Topx, Botx, Topn, Botn, DistEndTop, DistEndBot )
 
-     IF      ( DistBegTop > 0.0d0 .AND. DistEndTop <= 0.0d0 ) THEN  ! test top reflection
+     IF ( topRefl ) THEN
         IF ( atiType == 'C' ) THEN
            s1 = ( ray3D( is1 )%x( 1 ) - Topx( 1 ) ) / Top_deltax   ! proportional distance along segment
            s2 = ( ray3D( is1 )%x( 2 ) - Topx( 2 ) ) / Top_deltay   ! proportional distance along segment
@@ -887,7 +888,7 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
         ray3D( is + 1 )%NumTopBnc = ray3D( is )%NumTopBnc + 1
         CALL Distances3D( ray3D( is + 1 )%x, Topx,  Botx, Topn, Botn, DistEndTop, DistEndBot )
 
-     ELSE IF ( DistBegBot > 0.0d0 .AND. DistEndBot <= 0.0d0 ) THEN  ! test bottom reflection
+     ELSE IF ( botRefl ) THEN
 
         IF ( btyType == 'C' ) THEN
            s1 = ( ray3D( is1 )%x( 1 ) - Botx( 1 ) ) / Bot_deltax   ! proportional distance along segment

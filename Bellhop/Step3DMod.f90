@@ -9,7 +9,7 @@ MODULE Step3DMod
   
 CONTAINS
 
-  SUBROUTINE Step3D( ray0, ray2 )
+  SUBROUTINE Step3D( ray0, ray2, topRefl, botRefl )
 
     ! Does a single step along the ray
     ! x denotes the ray coordinate, ( x, y, z )
@@ -20,12 +20,13 @@ CONTAINS
 
     ! rays
     TYPE( ray3DPt ) :: ray0, ray1, ray2
+    LOGICAL, INTENT( OUT ) :: topRefl, botRefl
     INTEGER         :: iSegx0, iSegy0, iSegz0
     REAL  (KIND=8 ) :: gradc0( 3 ), gradc1( 3 ), gradc2( 3 ), &
          c0, cimag0, csq0, cxx0, cyy0, czz0, cxy0, cxz0, cyz0, cnn0, cmn0, cmm0, &
          c1, cimag1, csq1, cxx1, cyy1, czz1, cxy1, cxz1, cyz1, cnn1, cmn1, cmm1, &
          c2, cimag2,       cxx2, cyy2, czz2, cxy2, cxz2, cyz2, c_mat1( 2, 2 ), &
-         urayt0( 3 ), urayt1( 3 ), h, halfh, hw0, hw1, w0, w1, rho
+         urayt0( 3 ), urayt1( 3 ), urayt2( 3 ), h, halfh, hw0, hw1, w0, w1, rho
     COMPLEX( KIND=8 ) :: d_phi0, d_phi1
     REAL  (KIND=8 ) :: d_p_tilde0( 2 ), d_p_hat0( 2 ), d_q_tilde0( 2 ), d_q_hat0( 2 ), &
                        d_p_tilde1( 2 ), d_p_hat1( 2 ), d_q_tilde1( 2 ), d_q_hat1( 2 )
@@ -35,9 +36,9 @@ CONTAINS
     REAL  (KIND=8 ) :: p_tilde_in(  2 ), p_hat_in(  2 ), q_tilde_in(  2 ), q_hat_in(  2 ), &
          p_tilde_out( 2 ), p_hat_out( 2 ), RotMat( 2, 2 )
          
-    ! WRITE( PRTFile, * )
-    ! WRITE( PRTFile, * ) 'ray0 x t tau amp', ray0%x, ray0%t, ray0%tau, ray0%Amp
-    ! WRITE( PRTFile, * ) 'iSegx0 iSegy0 iSegz0', iSegz, iSegr
+    WRITE( PRTFile, * )
+    WRITE( PRTFile, * ) 'ray0 x t', ray0%x, ray0%t
+    WRITE( PRTFile, * ) 'iSegx iSegy iSegz', iSegx, iSegy, iSegz
            
     ! The numerical integrator used here is a version of the polygon (a.k.a. midpoint, leapfrog, or Box method), and similar
     ! to the Heun (second order Runge-Kutta method).
@@ -241,6 +242,7 @@ CONTAINS
   SUBROUTINE UpdateRayPQ ( ray1, ray0, h, d_phi, d_p_tilde, d_p_hat, d_q_tilde, d_q_hat )
     TYPE(    ray3DPt ), INTENT( INOUT ) :: ray1
     TYPE(    ray3DPt ), INTENT( IN ) :: ray0
+    REAL(    KIND=8  ), INTENT( IN ) :: h
     COMPLEX( KIND=8  ), INTENT( IN ) :: d_phi
     REAL(    KIND=8  ), INTENT( IN ) :: d_p_tilde( 2 ), d_p_hat( 2 ), d_q_tilde( 2 ), d_q_hat( 2 )
     
@@ -285,10 +287,10 @@ CONTAINS
     IF ( ABS( urayt( 3 ) ) > EPSILON( h1 ) ) THEN
        IF      ( SSP%z( iSegz0     ) > x(  3 ) .AND. iSegz0     > 1  ) THEN
           h1 = ( SSP%z( iSegz0     ) - x0( 3 ) ) / urayt( 3 )
-          ! write( *, * ) 'layer crossing', iSegz0, h1
+          WRITE( PRTFile, * ) 'layer crossing', iSegz0, h1
        ELSE IF ( SSP%z( iSegz0 + 1 ) < x(  3 ) .AND. iSegz0 + 1 < SSP%Nz ) THEN
           h1 = ( SSP%z( iSegz0 + 1 ) - x0( 3 ) ) / urayt( 3 )
-          ! write( *, * ) 'layer crossing', iSegz0, h1
+          WRITE( PRTFile, * ) 'layer crossing', iSegz0, h1
        END IF
     END IF
 
@@ -300,7 +302,7 @@ CONTAINS
     IF ( DOT_PRODUCT( Topn, d )  >= 0.0D0 ) THEN
        d0 = x0 - Topx   ! vector from top    node to ray origin
        h2 = -DOT_PRODUCT( d0, Topn ) / DOT_PRODUCT( urayt, Topn )
-       ! write( *, * ) 'top crossing'
+       WRITE( PRTFile, * ) 'top crossing'
     END IF
 
     ! bottom crossing
@@ -311,7 +313,7 @@ CONTAINS
     IF ( DOT_PRODUCT( Botn, d ) >= 0.0D0 ) THEN
        d0 = x0 - Botx   ! vector from bottom node to ray origin
        h3 = -DOT_PRODUCT( d0, Botn ) / DOT_PRODUCT( urayt, Botn )
-       ! write( *, * ) 'bottom crossing'
+       WRITE( PRTFile, * ) 'bottom crossing'
     END IF
 
     ! top/bottom segment crossing in x
@@ -327,10 +329,10 @@ CONTAINS
     IF ( ABS( urayt( 1 ) ) > EPSILON( h1 ) ) THEN
        IF       ( x(  1 ) < xSeg( 1 ) ) THEN
           h4 = -( x0( 1 ) - xSeg( 1 ) ) / urayt( 1 )
-          ! write( *, * ) 'segment crossing in x'
+          WRITE( PRTFile, * ) 'segment crossing in x'
        ELSE IF  ( x(  1 ) > xSeg( 2 ) ) THEN
           h4 = -( x0( 1 ) - xSeg( 2 ) ) / urayt( 1 )
-          ! write( *, * ) 'segment crossing in x'
+          WRITE( PRTFile, * ) 'segment crossing in x'
        END IF
     END IF
 
@@ -348,10 +350,10 @@ CONTAINS
     IF ( ABS( urayt( 2 ) ) > EPSILON( h1 ) ) THEN
        IF       ( x(  2 ) < ySeg( 1 ) ) THEN
           h5 = -( x0( 2 ) - ySeg( 1 ) ) / urayt( 2 )
-          ! write( *, * ) 'segment crossing in y'
+          WRITE( PRTFile, * ) 'segment crossing in y'
        ELSE IF  ( x(  2 ) > ySeg( 2 ) ) THEN
           h5 = -( x0( 2 ) - ySeg( 2 ) ) / urayt( 2 )
-          ! write( *, * ) 'segment crossing in y'
+          WRITE( PRTFile, * ) 'segment crossing in y'
        END IF
     END IF
 
@@ -363,7 +365,7 @@ CONTAINS
 
     IF ( CheckDiagCrossing( tri_n, d0, d ) ) THEN
        h6 = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       ! write( *, * ) 'diagonal crossing'
+       WRITE( PRTFile, * ) 'diagonal crossing'
     END IF
 
     ! triangle crossing within a bottom segment
@@ -374,7 +376,7 @@ CONTAINS
 
     IF ( CheckDiagCrossing( tri_n, d0, d ) ) THEN
        h7 = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       ! write( *, * ) 'diagonal crossing'
+       WRITE( PRTFile, * ) 'diagonal crossing'
     END IF
 
     h = MIN( h, h1, h2, h3, h4, h5, h6, h7 )  ! take limit set by shortest distance to a crossing
@@ -404,13 +406,13 @@ CONTAINS
     x2 = x0 + h * urayt
 
     ! interface crossing in depth
-    IF ( ABS( urayt( 3 ) ) > EPSILON( h1 ) ) THEN
-       IF      ( SSP%z( iSegz0     ) > x(  3 ) .AND. iSegz0     > 1  ) THEN
+    IF ( ABS( urayt( 3 ) ) > EPSILON( h ) ) THEN
+       IF      ( SSP%z( iSegz0     ) > x2( 3 ) .AND. iSegz0     > 1  ) THEN
           h  = ( SSP%z( iSegz0     ) - x0( 3 ) ) / urayt( 3 )
           x2 = x0 + h * urayt
           x2( 3 ) = SSP%z( iSegz0 )
           ! WRITE( PRTFile, * ) 'StepToBdry3D shallower h to', h, x2
-       ELSE IF ( SSP%z( iSegz0 + 1 ) < x(  3 ) .AND. iSegz0 + 1 < SSP%Nz ) THEN
+       ELSE IF ( SSP%z( iSegz0 + 1 ) < x2( 3 ) .AND. iSegz0 + 1 < SSP%Nz ) THEN
           h  = ( SSP%z( iSegz0 + 1 ) - x0( 3 ) ) / urayt( 3 )
           x2 = x0 + h * urayt
           x2( 3 ) = SSP%z( iSegz0 + 1 )
@@ -469,15 +471,15 @@ CONTAINS
        xSeg( 2 ) = MIN( xSeg( 2 ), SSP%Seg%x( iSegx0 + 1 ) )
     END IF
 
-    IF ( ABS( urayt( 1 ) ) > EPSILON( h1 ) ) THEN
-       IF       ( x(  1 ) < xSeg( 1 ) ) THEN
+    IF ( ABS( urayt( 1 ) ) > EPSILON( h ) ) THEN
+       IF       ( x2( 1 ) < xSeg( 1 ) ) THEN
           h  = -( x0( 1 ) - xSeg( 1 ) ) / urayt( 1 )
           x2 = x0 + h * urayt
           x2( 1 ) = xSeg( 1 )
           topRefl = .FALSE.
           botRefl = .FALSE.
           ! WRITE( PRTFile, * ) 'StepToBdry3D X min bound h to', h, x2
-       ELSE IF  ( x(  1 ) > xSeg( 2 ) ) THEN
+       ELSE IF  ( x2( 1 ) > xSeg( 2 ) ) THEN
           h  = -( x0( 1 ) - xSeg( 2 ) ) / urayt( 1 )
           x2 = x0 + h * urayt
           x2( 1 ) = xSeg( 2 )
@@ -497,18 +499,18 @@ CONTAINS
     END IF
 
     ! LP: removed 1000 * epsilon which mbp had comment questioning also
-    IF ( ABS( urayt( 2 ) ) > EPSILON( h1 ) ) THEN
-       IF       ( x(  2 ) < ySeg( 1 ) ) THEN
+    IF ( ABS( urayt( 2 ) ) > EPSILON( h ) ) THEN
+       IF       ( x2( 2 ) < ySeg( 1 ) ) THEN
           h  = -( x0( 2 ) - ySeg( 1 ) ) / urayt( 2 )
           x2 = x0 + h * urayt
-          x( 1 ) = ySeg( 1 )
+          x2( 1 ) = ySeg( 1 )
           topRefl = .FALSE.
           botRefl = .FALSE.
           ! WRITE( PRTFile, * ) 'StepToBdry3D Y min bound h to', h, x2
-       ELSE IF  ( x(  2 ) > ySeg( 2 ) ) THEN
+       ELSE IF  ( x2( 2 ) > ySeg( 2 ) ) THEN
           h  = -( x0( 2 ) - ySeg( 2 ) ) / urayt( 2 )
           x2 = x0 + h * urayt
-          x( 1 ) = ySeg( 2 )
+          x2( 1 ) = ySeg( 2 )
           topRefl = .FALSE.
           botRefl = .FALSE.
           ! WRITE( PRTFile, * ) 'StepToBdry3D Y max bound h to', h, x2
@@ -516,20 +518,20 @@ CONTAINS
     END IF
 
     ! triangle crossing within a top segment
-    d     = x  - Topx   ! vector from bottom node to ray end
+    d     = x2 - Topx   ! vector from bottom node to ray end
     d0    = x0 - Topx   ! vector from bottom node to ray origin
     tri_n = [ -Top_deltay, Top_deltax, 0.0d0 ]
 
     IF ( CheckDiagCrossing( tri_n, d0, d ) ) THEN
        h  = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       EnsureStepOverTriDiagBdry: DO k = 1, 100
+       EnsureStepOverTriDiagTopBdry: DO k = 1, 100
           x2 = x0 + h * urayt
           ! LP: Since this is not an exact floating-point value to step
           ! to, make sure we have stepped over the boundary.
-          IF ( CheckDiagCrossing( tri_n, d0, x - Topx ) ) EXIT EnsureStepOverTriDiagBdry
+          IF ( CheckDiagCrossing( tri_n, d0, x2 - Topx ) ) EXIT EnsureStepOverTriDiagTopBdry
           ! LP: Slightly increase h if not.
           h = h * 1.000001
-       END DO EnsureStepOverTriDiagBdry
+       END DO EnsureStepOverTriDiagTopBdry
        IF ( k >= 100 ) WRITE( PRTFile, * ) 'EnsureStepOverTriDiagBdry did not converge'
        topRefl = .FALSE.
        botRefl = .FALSE.
@@ -537,20 +539,20 @@ CONTAINS
     END IF
 
     ! triangle crossing within a bottom segment
-    d     = x  - Botx   ! vector from bottom node to ray end
+    d     = x2 - Botx   ! vector from bottom node to ray end
     d0    = x0 - Botx   ! vector from bottom node to ray origin
     tri_n = [ -Bot_deltay, Bot_deltax, 0.0d0 ]
 
     IF ( CheckDiagCrossing( tri_n, d0, d ) ) THEN
        h  = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       EnsureStepOverTriDiagBdry: DO k = 1, 100
+       EnsureStepOverTriDiagBotBdry: DO k = 1, 100
           x2 = x0 + h * urayt
           ! LP: Since this is not an exact floating-point value to step
           ! to, make sure we have stepped over the boundary.
-          IF ( CheckDiagCrossing( tri_n, d0, x - Botx ) ) EXIT EnsureStepOverTriDiagBdry
+          IF ( CheckDiagCrossing( tri_n, d0, x2 - Botx ) ) EXIT EnsureStepOverTriDiagBotBdry
           ! LP: Slightly increase h if not.
           h = h * 1.000001
-       END DO EnsureStepOverTriDiagBdry
+       END DO EnsureStepOverTriDiagBotBdry
        IF ( k >= 100 ) WRITE( PRTFile, * ) 'EnsureStepOverTriDiagBdry did not converge'
        topRefl = .FALSE.
        botRefl = .FALSE.
@@ -576,7 +578,7 @@ CONTAINS
           botRefl = .FALSE.
        END IF
     END IF
-  END SUBROUTINE ReduceStep3D
+  END SUBROUTINE StepToBdry3D
 
   LOGICAL FUNCTION CheckDiagCrossing( tri_n, d0, d )
     REAL (KIND=8), INTENT( IN ) :: d( 3 ), d0( 3 ), tri_n( 3 )
@@ -584,6 +586,6 @@ CONTAINS
     CheckDiagCrossing = &
        ( DOT_PRODUCT( tri_n, d0 ) > 0.0d0 .AND. DOT_PRODUCT( tri_n, d ) <= 0.0d0 ) .OR. &
        ( DOT_PRODUCT( tri_n, d0 ) < 0.0d0 .AND. DOT_PRODUCT( tri_n, d ) >= 0.0d0 )
-  END FUNCTION
+  END FUNCTION CheckDiagCrossing
 
 END MODULE Step3DMod
