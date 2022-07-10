@@ -16,14 +16,12 @@ MODULE bdry3Dmod
   IMPLICIT NONE
   SAVE
   INTEGER, PARAMETER :: ATIFile = 40, BTYFile = 41, Number_to_Echo = 21
-  INTEGER            :: IsegTopT( 1 ), IsegBotT( 1 ), IsegTopx, IsegTopy, IsegBotx, IsegBoty, &
+  INTEGER            :: IsegTopx, IsegTopy, IsegBotx, IsegBoty, &
        NATIPts( 2 ), NBTYPts( 2 )
   INTEGER            :: ix, iy, IOStat, IAllocStat, iSmallStepCtr = 0
   REAL (KIND=8) :: xTopseg( 2 ), yTopseg( 2 ), xBotseg( 2 ), yBotseg( 2 ), &
        Topx( 3 ), Botx( 3 ), &   ! coordinates of corner of active rectangle
        Topn( 3 ), Botn( 3 )      ! tangent and normal    of active triangle
-  REAL (KIND=8), PROTECTED :: Top_tri_n( 2 ), Bot_tri_n( 2 )   ! triangle normals
-  REAL (KIND=8), PROTECTED :: Top_deltax, Top_deltay, Bot_deltax, Bot_deltay   ! lengths of sides for active rectangel
   REAL (KIND=8), PARAMETER :: big = 1E25                  ! large number used for domain termination when no altimetry/bathymetry given
 
   CHARACTER  (LEN=1) :: atiType, btyType
@@ -150,9 +148,6 @@ CONTAINS
 
        TopGlobaly( 1 ) = -big
        TopGlobaly( 2 ) = +big
-
-       Top_deltax = 2.0 * big
-       Top_deltay = 2.0 * big
 
        Top( 1, 1 )%x = [ -big, -big, DepthT ]
        Top( 1, 2 )%x = [ -big,  big, DepthT ]
@@ -295,9 +290,6 @@ CONTAINS
        BotGlobaly( 1 ) = -big
        BotGlobaly( 2 ) = +big
 
-       Bot_deltax = 2.0 * big
-       Bot_deltay = 2.0 * big
-
        Bot( 1, 1 )%x = [ -big, -big, DepthB ]
        Bot( 1, 2 )%x = [ -big,  big, DepthB ]
        Bot( 2, 1 )%x = [  big, -big, DepthB ]
@@ -326,223 +318,186 @@ CONTAINS
 
   ! **********************************************************************!
 
-  SUBROUTINE GetTopSeg3D( x )
+  SUBROUTINE GetTopSeg3D( x, t )
 
-    ! Get the Top segment info (index and range interval) for range, r
+    ! Get the Top segment info (index and range interval) for XY position, x
     ! sets Topx and Topn
+    ! LP: According to the original logic, if the ray escapes the box here,
+    ! a warning is printed, and the other segment info is not updated. If
+    ! the ray escaped the box to the negative side in either dimension, or
+    ! the results are NaN below (should never happen), the ray is then
+    ! terminated in TraceRay without the current step. However, if the ray
+    ! escaped to the positive side, the ray is terminated as part of the
+    ! normal stopping conditions, including the current step.
+    ! On top of that weird asymmetry, of course the original logic allowed
+    ! for steps to the edge of the same segment they are currently in,
+    ! whereas we always step into the next segment according to the tangent.
+    ! Finally, in 2D, the altimetry / bathymetry are extended to very large
+    ! values so this never gets hit, whereas in Nx2D and 3D it is not so
+    ! almost all rays hit this case.
+    ! This has been changed to:
+    ! - An override so being at the outer edge of a segment is OK for the
+    !   last segment (just for this step)
+    ! - If the position is actually outside the segment, print a warning
+    !   and put it in the nearest valid segment.
+    ! - Changed the stopping condition to stop if on the boundary and
+    !   pointing outwards.
 
     INTEGER, PARAMETER :: PRTFile = 6
-    REAL (KIND=8), INTENT( IN ) :: x( 3 )
-    LOGICAL       :: Goodx = .TRUE., Goody = .TRUE.
-    INTEGER       :: IsegTopT( 1 )
+    REAL (KIND=8), INTENT( IN ) :: x( 3 ), t( 3 )
+    INTEGER :: nx, ny
+    REAL (KIND=8) :: Top_tri_n( 2 )   ! triangle normals
+    
+    nx = NatiPts( 1 )
+    ny = NatiPts( 2 )
+    
+    IsegTopx = MIN( MAX( IsegTopx, 1 ), nx - 1 )
+    IsegTopy = MIN( MAX( IsegTopy, 1 ), ny - 1 )
+    
+    IF ( t( 1 ) >= 0.0 ) THEN
+       DO WHILE ( IsegTopx >= 1 .AND. Top( IsegTopx, 1 )%x( 1 ) > x( 1 ) )
+          IsegTopx = IsegTopx - 1
+       END DO
+       DO WHILE ( IsegTopx >= 1 .AND. IsegTopx < nx .AND. Top( IsegTopx + 1, 1 )%x( 1 ) <= x( 1 ) )
+          IsegTopx = IsegTopx + 1
+       END DO
+    ELSE
+      DO WHILE ( IsegTopx < nx .AND. Top( IsegTopx + 1, 1 )%x( 1 ) < x( 1 ) )
+         IsegTopx = IsegTopx + 1
+      END DO
+      DO WHILE ( IsegTopx >= 1 .AND. IsegTopx < nx .AND. Top( IsegTopx, 1 )%x( 1 ) >= x( 1 ) )
+         IsegTopx = IsegTopx - 1
+      END DO
+    END IF
+    IF ( t( 2 ) >= 0.0 ) THEN
+      DO WHILE ( IsegTopy >= 1 .AND. Top( 1, IsegTopy )%x( 2 ) > x( 2 ) )
+         IsegTopy = IsegTopy - 1
+      END DO
+      DO WHILE ( IsegTopy >= 1 .AND. IsegTopy < ny .AND. Top( 1, IsegTopy + 1 )%x( 2 ) <= x( 2 ) )
+         IsegTopy = IsegTopy + 1
+      END DO
+    ELSE
+      DO WHILE ( IsegTopy < ny .AND. Top( 1, IsegTopy + 1 )%x( 2 ) < x( 2 ) )
+         IsegTopy = IsegTopy + 1
+      END DO
+      DO WHILE ( IsegTopy >= 1 .AND. IsegTopy < ny .AND. Top( 1, IsegTopy )%x( 2 ) >= x( 2 ) )
+         IsegTopy = IsegTopy - 1
+      END DO
+    END IF
+    
+    IF ( IsegTopx ==  0 .AND. Top(  1,  1 )%x( 1 ) == x( 1 ) ) IsegTopx = 1
+    IF ( IsegTopx == nx .AND. Top( nx,  1 )%x( 1 ) == x( 1 ) ) IsegTopx = nx - 1
+    IF ( IsegTopy ==  0 .AND. Top(  1,  1 )%x( 2 ) == x( 2 ) ) IsegTopy = 1
+    IF ( IsegTopy == ny .AND. Top(  1, ny )%x( 2 ) == x( 2 ) ) IsegTopy = ny - 1
+    
+    IF ( IsegTopx <= 0 .OR. IsegTopx >= nx .OR. IsegTopy <= 0 .OR. IsegTopy >= ny ) THEN
+       WRITE( PRTFile, * ) 'Warning: GetTopSeg3D: Top altimetry undefined above the ray, x', x
+       IsegTopx = MIN( MAX( IsegTopx, 1 ), nx - 1 )
+       IsegTopy = MIN( MAX( IsegTopy, 1 ), ny - 1 )
+    END IF
+    
+    xTopSeg  = [ Top( IsegTopx, 1 )%x( 1 ), Top( IsegTopx + 1, 1 )%x( 1 ) ]   ! segment limits in range
+    yTopSeg  = [ Top( 1, IsegTopy )%x( 2 ), Top( 1, IsegTopy + 1 )%x( 2 ) ]   ! segment limits in range
+    
+    Topx = Top( IsegTopx, IsegTopy )%x
 
-    ! x coordinate
-
-    IF ( x( 1 ) < xTopSeg( 1 ) .OR. x( 1 ) > xTopSeg( 2 ) ) THEN
-
-       IsegTopT = MAXLOC( Top( :, 1 )%x( 1 ), Top( :, 1 )%x( 1 ) < x( 1 ) )
-
-       IF ( IsegTopT( 1 ) > 0 .AND. IsegTopT( 1 ) < NatiPts( 1 ) ) THEN  ! IsegTop MUST LIE IN [ 1, NatiPts-1 ]
-          Goodx = .TRUE.
-          IsegTopx = IsegTopT( 1 )
-          xTopSeg  = [ Top( IsegTopx, 1 )%x( 1 ), Top( IsegTopx + 1, 1 )%x( 1 ) ]   ! segment limits in range
-          Top_deltax = xTopSeg( 2 ) - xTopSeg( 1 )
-       ELSE
-          Goodx = .FALSE.
-          WRITE( PRTFile, * ) 'x = ', x( 1 )
-          WRITE( PRTFile, * ) 'xMin = ', Top( 1           , 1 )%x( 1 )
-          WRITE( PRTFile, * ) 'xMax = ', Top( NatiPts( 1 ), 1 )%x( 1 )
-          WRITE( PRTFile, * ) 'Warning in GetTopSeg3D : Altimetry undefined above the ray'
-       ENDIF
+    ! identify the normal based on the active triangle of a pair
+    ! normal of triangle side pointing up and to the left
+    Top_tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ) ]
+    IF ( DOT_PRODUCT( x( 1 : 2 ) - Top( IsegTopx, IsegTopy )%x( 1 : 2 ), Top_tri_n ) < 0 ) THEN
+      Topn = Top( IsegTopx, IsegTopy )%n1
+    ELSE
+      Topn = Top( IsegTopx, IsegTopy )%n2
     END IF
 
-    ! y coordinate
-
-    IF ( x( 2 ) < yTopSeg( 1 ) .OR. x( 2 ) > yTopSeg( 2 ) ) THEN
-
-       IsegTopT = MAXLOC( Top( 1, : )%x( 2 ), Top( 1, : )%x( 2 ) < x( 2 ) )
-
-       IF ( IsegTopT( 1 ) > 0 .AND. IsegTopT( 1 ) < NatiPts( 2 ) ) THEN  ! IsegTop MUST LIE IN [ 1, NatiPts-1 ]
-          GoodY = .TRUE.
-          IsegTopy = IsegTopT( 1 )
-          yTopSeg  = [ Top( 1, IsegTopy )%x( 2 ), Top( 1, IsegTopy + 1 )%x( 2 ) ]   ! segment limits in range
-          Top_deltay = yTopSeg( 2 ) - yTopSeg( 1 )
-       ELSE
-          GoodY = .FALSE.
-          WRITE( PRTFile, * ) 'y = ', x( 2 )
-          WRITE( PRTFile, * ) 'yMin = ', Top( 1, 1            )%x( 2 )
-          WRITE( PRTFile, * ) 'yMax = ', Top( 1, NatiPts( 2 ) )%x( 2 )
-          WRITE( PRTFile, * ) 'Warning in GetTopSeg3D : Altimetry undefined above the ray'
-       ENDIF
-    END IF
-
-    IF ( Goodx .AND. Goody ) THEN
-       Topx = Top( IsegTopx, IsegTopy )%x
-
-       ! identify the normal based on the active triangle of a pair
-
-       Top_tri_n = [ -Top_deltay, Top_deltax ]  ! normal of triangle side pointing up and to the left
-
-       IF ( DOT_PRODUCT( x( 1 : 2 ) - Top( IsegTopx, IsegTopy )%x( 1 : 2 ), Top_tri_n ) < 0 ) THEN
-          Topn = Top( IsegTopx, IsegTopy )%n1
-       ELSE
-          Topn = Top( IsegTopx, IsegTopy )%n2
-       END IF
-
-       ! if the Top depth is bad (a NaN) then set the segment flags to indicate that
-       IF ( ISNAN( Topx( 3 ) ) .OR. ANY( ISNAN( Topn ) ) ) THEN
-          IsegTopx = 0
-          IsegTopy = 0
-       END IF
+    ! if the Bot depth is bad (a NaN) then error out
+    ! LP: Originally set segment to invalid and relied on later code to catch this.
+    IF ( ISNAN( Topx( 3 ) ) .OR. ANY( ISNAN( Topn ) ) ) THEN
+       WRITE( PRTFile, * ) 'Error: Boundary segment contains NaN!'
+       CALL ERROUT( 'BELLHOP: GetTopSeg3D', 'Boundary segment contains NaN' )
     END IF
   END SUBROUTINE GetTopSeg3D
 
   ! **********************************************************************!
 
-  SUBROUTINE GetBotSeg3D( x )
-
-    ! Get the Bottom segment info (index and range interval) for range, r
+  SUBROUTINE GetBotSeg3D( x, t )
+    
+    ! Get the Bottom segment info (index and range interval) for XY position, x
     ! sets Botx and Botn
-
+    ! LP: See comment in GetTopSeg3D.
+    
     INTEGER, PARAMETER :: PRTFile = 6
-    REAL (KIND=8), INTENT( IN ) :: x( 3 )
-    LOGICAL       :: Goodx = .TRUE., Goody = .TRUE.
-    INTEGER       :: IsegBotT( 1 )
+    REAL (KIND=8), INTENT( IN ) :: x( 3 ), t( 3 )
+    INTEGER :: nx, ny
+    REAL (KIND=8) :: Bot_tri_n( 2 )   ! triangle normals
+    
+    nx = NbtyPts( 1 )
+    ny = NbtyPts( 2 )
+    
+    IsegBotx = MIN( MAX( IsegBotx, 1 ), nx - 1 )
+    IsegBoty = MIN( MAX( IsegBoty, 1 ), ny - 1 )
+    
+    IF ( t( 1 ) >= 0.0 ) THEN
+       DO WHILE ( IsegBotx >= 1 .AND. Bot( IsegBotx, 1 )%x( 1 ) > x( 1 ) )
+          IsegBotx = IsegBotx - 1
+       END DO
+       DO WHILE ( IsegBotx >= 1 .AND. IsegBotx < nx .AND. Bot( IsegBotx + 1, 1 )%x( 1 ) <= x( 1 ) )
+          IsegBotx = IsegBotx + 1
+       END DO
+    ELSE
+      DO WHILE ( IsegBotx < nx .AND. Bot( IsegBotx + 1, 1 )%x( 1 ) < x( 1 ) )
+         IsegBotx = IsegBotx + 1
+      END DO
+      DO WHILE ( IsegBotx >= 1 .AND. IsegBotx < nx .AND. Bot( IsegBotx, 1 )%x( 1 ) >= x( 1 ) )
+         IsegBotx = IsegBotx - 1
+      END DO
+    END IF
+    IF ( t( 2 ) >= 0.0 ) THEN
+      DO WHILE ( IsegBoty >= 1 .AND. Bot( 1, IsegBoty )%x( 2 ) > x( 2 ) )
+         IsegBoty = IsegBoty - 1
+      END DO
+      DO WHILE ( IsegBoty >= 1 .AND. IsegBoty < ny .AND. Bot( 1, IsegBoty + 1 )%x( 2 ) <= x( 2 ) )
+         IsegBoty = IsegBoty + 1
+      END DO
+    ELSE
+      DO WHILE ( IsegBoty < ny .AND. Bot( 1, IsegBoty + 1 )%x( 2 ) < x( 2 ) )
+         IsegBoty = IsegBoty + 1
+      END DO
+      DO WHILE ( IsegBoty >= 1 .AND. IsegBoty < ny .AND. Bot( 1, IsegBoty )%x( 2 ) >= x( 2 ) )
+         IsegBoty = IsegBoty - 1
+      END DO
+    END IF
+    
+    IF ( IsegBotx ==  0 .AND. Bot(  1,  1 )%x( 1 ) == x( 1 ) ) IsegBotx = 1
+    IF ( IsegBotx == nx .AND. Bot( nx,  1 )%x( 1 ) == x( 1 ) ) IsegBotx = nx - 1
+    IF ( IsegBoty ==  0 .AND. Bot(  1,  1 )%x( 2 ) == x( 2 ) ) IsegBoty = 1
+    IF ( IsegBoty == ny .AND. Bot(  1, ny )%x( 2 ) == x( 2 ) ) IsegBoty = ny - 1
+    
+    IF ( IsegBotx <= 0 .OR. IsegBotx >= nx .OR. IsegBoty <= 0 .OR. IsegBoty >= ny ) THEN
+       WRITE( PRTFile, * ) 'Warning: GetBotSeg3D: Bottom bathymetry undefined below the ray, x', x
+       IsegBotx = MIN( MAX( IsegBotx, 1 ), nx - 1 )
+       IsegBoty = MIN( MAX( IsegBoty, 1 ), ny - 1 )
+    END IF
+    
+    xBotSeg  = [ Bot( IsegBotx, 1 )%x( 1 ), Bot( IsegBotx + 1, 1 )%x( 1 ) ]   ! segment limits in range
+    yBotSeg  = [ Bot( 1, IsegBoty )%x( 2 ), Bot( 1, IsegBoty + 1 )%x( 2 ) ]   ! segment limits in range
+    
+    Botx = Bot( IsegBotx, IsegBoty )%x
 
-    ! x coordinate
-
-    IF ( x( 1 ) < xBotSeg( 1 ) .OR. x( 1 ) > xBotSeg( 2 ) ) THEN   ! are we outside the segment?
-
-       ! calculate index of bracketing segment
-       IsegBotT = MAXLOC( Bot( :, 1 )%x( 1 ), Bot( :, 1 )%x( 1 ) < x( 1 ) )
-
-!!$       ! The above MAXLOC is concise, but it's unnecessarily testing every segment
-!!$       ! Only need to test adjacent segments; however, this doesn't seem to be much faster
-!!$       ! we reached the same conclusion in SSPMod/Quad
-
-!!$       IF ( xBotSeg( 1 ) == big ) THEN   ! for first call we do a full search in a lazy way
-!!$          IsegBotT = MAXLOC( Bot( :, 1 )%x( 1 ), Bot( :, 1 )%x( 1 ) < x( 1 ) )
-!!$       ELSE
-!!$          ! search left
-!!$          DO WHILE ( x( 1 ) < xBotSeg( 1 ) .AND. IsegBotx > 1 )
-!!$             IsegBotx = IsegBotx - 1
-!!$             xBotSeg  = [ Bot( IsegBotx, 1 )%x( 1 ), Bot( IsegBotx + 1, 1 )%x( 1 ) ]   ! segment limits in range
-!!$          END DO
-!!$
-!!$          ! search right
-!!$          DO WHILE ( x( 1 ) > xBotSeg( 2 ) .AND. IsegBotx < NbtyPts( 1 ) - 1 )
-!!$             IsegBotx = IsegBotx + 1
-!!$             xBotSeg  = [ Bot( IsegBotx, 1 )%x( 1 ), Bot( IsegBotx + 1, 1 )%x( 1 ) ]   ! segment limits in range
-!!$          END DO
-!!$
-!!$          IsegBotT( 1 ) = IsegBotx
-!!$       END IF
-!!$
-!!$       ! if we didn't find a bracketing segment set the segment to 0 indicating a failure
-!!$       IsegBotx = IsegBotT( 1 )
-!!$       xBotSeg  = [ Bot( IsegBotx, 1 )%x( 1 ), Bot( IsegBotx + 1, 1 )%x( 1 ) ] 
-!!$       IF ( x( 1 ) < xBotSeg( 1 ) .OR. x( 1 ) > xBotSeg( 2 ) ) IsegBotT( 1 ) = 0
-
-!!$       ! Here's yet another way to do the search for the segment
-!!$       ! on the first call, need to do a full search
-!!$       IF ( xBotSeg( 1 ) == big ) THEN
-!!$          IsegBotT = MAXLOC( Bot( :, 1 )%x( 1 ), Bot( :, 1 )%x( 1 ) < x( 1 ) )
-!!$       ELSE
-!!$          DO
-!!$             IF (      x( 1 ) < xBotSeg( 1 ) ) THEN
-!!$                IF ( IsegBotx <= 0            ) EXIT
-!!$                IsegBotx = IsegBotx - 1
-!!$             ELSE IF ( x( 1 ) > xBotSeg( 2 ) ) THEN
-!!$                IF ( IsegBotx >= NBtyPts( 1 ) ) EXIT
-!!$                IsegBotx = IsegBotx + 1
-!!$             ELSE
-!!$                EXIT
-!!$             END IF
-!!$
-!!$             xBotSeg  = [ Bot( IsegBotx, 1 )%x( 1 ), Bot( IsegBotx + 1, 1 )%x( 1 ) ]   ! segment limits in range
-!!$          END DO
-!!$
-!!$          IsegBotT( 1 ) = IsegBotx
-!!$       END IF
-
-       IF ( IsegBotT( 1 ) > 0 .AND. IsegBotT( 1 ) < NbtyPts( 1 ) ) THEN  ! IsegBot MUST LIE IN [ 1, NbtyPts-1 ]
-          Goodx = .TRUE.
-          IsegBotx = IsegBotT( 1 )   
-          xBotSeg  = [ Bot( IsegBotx, 1 )%x( 1 ), Bot( IsegBotx + 1, 1 )%x( 1 ) ]   ! segment limits in range
-          Bot_deltax = xBotSeg( 2 ) - xBotSeg( 1 )
-       ELSE
-          Goodx = .FALSE.
-          IsegBotx = 0
-          WRITE( PRTFile, * ) 'x = ', x( 1 )
-          WRITE( PRTFile, * ) 'xMin = ', Bot( 1           , 1 )%x( 1 )
-          WRITE( PRTFile, * ) 'xMax = ', Bot( NbtyPts( 1 ), 1 )%x( 1 )
-          WRITE( PRTFile, * ) 'Warning in GetBotSeg3D : Bathymetry undefined below the ray'
-       ENDIF
-
+    ! identify the normal based on the active triangle of a pair
+    ! normal of triangle side pointing up and to the left
+    Bot_tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ) ]
+    IF ( DOT_PRODUCT( x( 1 : 2 ) - Bot( IsegBotx, IsegBoty )%x( 1 : 2 ), Bot_tri_n ) < 0 ) THEN
+      Botn = Bot( IsegBotx, IsegBoty )%n1
+    ELSE
+      Botn = Bot( IsegBotx, IsegBoty )%n2
     END IF
 
-    ! y coordinate
-
-    IF ( x( 2 ) < yBotSeg( 1 ) .OR. x( 2 ) > yBotSeg( 2 ) ) THEN
-
-       IsegBotT = MAXLOC( Bot( 1, : )%x( 2 ), Bot( 1, : )%x( 2 ) < x( 2 ) )
-
-!!$       ! The above MAXLOC is concise, but it's unnecessarily testing every segment
-!!$       ! Only need to test adjacent segments; however, this doesn't seem to be much faster
-!!$       ! on the first call, need to do a full search
-!!$       IF ( yBotSeg( 1 ) == big ) THEN
-!!$          IsegBotT = MAXLOC( Bot( 1, : )%x( 2 ), Bot( 1, : )%x( 2 ) < x( 2 ) )
-!!$       ELSE
-!!$          DO
-!!$             IF (      x( 2 ) < yBotSeg( 1 ) ) THEN
-!!$                IF ( IsegBoty <= 0            ) EXIT
-!!$                IsegBoty = IsegBoty - 1
-!!$             ELSE IF ( x( 2 ) > yBotSeg( 2 ) ) THEN
-!!$                IF ( IsegBoty >= NBtyPts( 2 ) ) EXIT
-!!$                IsegBoty = IsegBoty + 1
-!!$             ELSE
-!!$                EXIT
-!!$             END IF
-!!$             yBotSeg  = [ Bot( 1, IsegBoty )%x( 2 ), Bot( 1, IsegBoty + 1 )%x( 2 ) ]   ! segment limits in range
-!!$          END DO
-!!$
-!!$          IsegBotT( 1 ) = IsegBoty
-!!$       END IF
-
-       IF ( IsegBotT( 1 ) > 0 .AND. IsegBotT( 1 ) < NbtyPts( 2 ) ) THEN  ! IsegBot MUST LIE IN [ 1, NbtyPts-1 ]
-          Goody = .TRUE.
-          IsegBoty = IsegBotT( 1 )
-          yBotSeg  = [ Bot( 1, IsegBoty )%x( 2 ), Bot( 1, IsegBoty + 1 )%x( 2 ) ]   ! segment limits in range
-          Bot_deltay = yBotSeg( 2 ) - yBotSeg( 1 )
-       ELSE
-          Goody = .FALSE.
-          IsegBoty = 0
-          WRITE( PRTFile, * ) 'y = ', x( 2 )
-          WRITE( PRTFile, * ) 'yMin = ', Bot( 1, 1            )%x( 2 )
-          WRITE( PRTFile, * ) 'yMax = ', Bot( 1, NbtyPts( 2 ) )%x( 2 )
-          WRITE( PRTFile, * ) 'Warning in GetBotSeg3D : Bathymetry undefined below the ray'
-       ENDIF
-
-    END IF
-
-    IF ( Goodx .AND. Goody ) THEN
-       Botx = Bot( IsegBotx, IsegBoty )%x
-
-       ! identify the normal based on the active triangle of a pair
-
-       Bot_tri_n = [ -Bot_deltay, Bot_deltax ]  ! normal of triangle side pointing up and to the left
-
-       IF ( DOT_PRODUCT( x( 1 : 2 ) - Bot( IsegBotx, IsegBoty )%x( 1 : 2 ), Bot_tri_n ) < 0 ) THEN
-          Botn = Bot( IsegBotx, IsegBoty )%n1
-       ELSE
-          Botn = Bot( IsegBotx, IsegBoty )%n2
-       END IF
-
-       ! if the Bot depth is bad (a NaN) then set the segment flags to indicate that
-       IF ( ISNAN( Botx( 3 ) ) .OR. ANY( ISNAN( Botn ) ) ) THEN
-          IsegBotx = 0
-          IsegBoty = 0
-       END IF
+    ! if the Bot depth is bad (a NaN) then error out
+    ! LP: Originally set segment to invalid and relied on later code to catch this.
+    IF ( ISNAN( Botx( 3 ) ) .OR. ANY( ISNAN( Botn ) ) ) THEN
+       WRITE( PRTFile, * ) 'Error: Boundary segment contains NaN!'
+       CALL ERROUT( 'BELLHOP: GetBotSeg3D', 'Boundary segment contains NaN' )
     END IF
   END SUBROUTINE GetBotSeg3D
 

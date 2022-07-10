@@ -480,10 +480,12 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
   REAL     (KIND=8), INTENT( IN ) :: xs( 3 )     ! x-y-z coordinate of the source
   INTEGER           :: is, is1                   ! index for a step along the ray
   REAL     (KIND=8) :: x( 3 )                    ! ray coordinate
+  REAL     (KIND=8) :: t_o( 3 )                  ! tangent in ocean space
   !REAL     (KIND=8) :: c, cimag, gradc( 2 ), crr, crz, czz, rho
   REAL     (KIND=8) :: DistBegTop, DistEndTop, DistBegBot, DistEndBot ! Distances from ray beginning, end to top and bottom
   REAL     (KIND=8) :: tinit( 2 ), tradial( 2 ), BotnInt( 3 ), TopnInt( 3 ), s1, s2
   REAL     (KIND=8) :: z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy
+  REAL     (KIND=8) :: term_minx, term_miny, term_maxx, term_maxy
 
   ! *** Initial conditions ***
 
@@ -501,11 +503,16 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
   ray2D( 1 )%Phase     = 0.0
   ray2D( 1 )%NumTopBnc = 0
   ray2D( 1 )%NumBotBnc = 0
-
-  ! *** Trace the beam ***
-
-  CALL GetTopSeg3D( xs )   ! identify the top    segment above the source
-  CALL GetBotSeg3D( xs )   ! identify the bottom segment below the source
+  
+  IsegTopx = 1
+  IsegTopy = 1
+  IsegBotx = 1
+  IsegBoty = 1
+  t_o( 1 ) = ray2D( 1 )%t( 1 ) * tradial( 1 )
+  t_o( 2 ) = ray2D( 1 )%t( 1 ) * tradial( 2 )
+  t_o( 3 ) = ray2D( 1 )%t( 2 )
+  CALL GetTopSeg3D( xs, t_o )   ! identify the top    segment above the source
+  CALL GetBotSeg3D( xs, t_o )   ! identify the bottom segment below the source
 
   ! Trace the beam (note that Reflect alters the step index is)
   is = 0
@@ -526,9 +533,12 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
      x( 1 ) = xs( 1 ) + ray2D( is1 )%x( 1 ) * tradial( 1 )
      x( 2 ) = xs( 2 ) + ray2D( is1 )%x( 1 ) * tradial( 2 )
      x( 3 ) = ray2D( is1 )%x( 2 )
+     t_o( 1 ) = ray2D( is1 )%t( 1 ) * tradial( 1 )
+     t_o( 2 ) = ray2D( is1 )%t( 1 ) * tradial( 2 )
+     t_o( 3 ) = ray2D( is1 )%t( 2 )
 
-     CALL GetTopSeg3D( x )    ! identify the top    segment above the source
-     CALL GetBotSeg3D( x )    ! identify the bottom segment below the source
+     CALL GetTopSeg3D( x, t_o )    ! identify the top    segment above the source
+     CALL GetBotSeg3D( x, t_o )    ! identify the bottom segment below the source
 
      IF ( IsegTopx == 0 .OR. IsegTopy == 0 .OR. IsegBotx == 0 .OR. IsegBoty == 0 ) THEN ! we escaped the box
         Beam%Nsteps = is
@@ -551,8 +561,8 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
                  xs( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
                            ray2D( is + 1 )%x( 2 ) ]
 
-           s1     = ( x( 1 ) - Topx( 1 ) ) / Top_deltax   ! proportional distance along segment
-           s2     = ( x( 2 ) - Topx( 2 ) ) / Top_deltay   ! proportional distance along segment
+           s1     = ( x( 1 ) - Topx( 1 ) ) / ( xTopSeg( 2 ) - xTopSeg( 1 ) )   ! proportional distance along segment
+           s2     = ( x( 2 ) - Topx( 2 ) ) / ( yTopSeg( 2 ) - yTopSeg( 1 ) )   ! proportional distance along segment
 
            TopnInt = Top( IsegTopx,     IsegTopy     )%Noden * ( 1 - s1 ) * ( 1 - s2 ) +  &
                      Top( IsegTopx + 1, IsegTopy     )%Noden * ( s1     ) * ( 1 - s2 ) +  &
@@ -592,8 +602,8 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
                  xs( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
                            ray2D( is + 1 )%x( 2 ) ]
 
-           s1     = ( x( 1 ) - Botx( 1 ) ) / Bot_deltax   ! proportional distance along segment
-           s2     = ( x( 2 ) - Botx( 2 ) ) / Bot_deltay   ! proportional distance along segment
+           s1     = ( x( 1 ) - Botx( 1 ) ) / ( xBotSeg( 2 ) - xBotSeg( 1 ) )   ! proportional distance along segment
+           s2     = ( x( 2 ) - Botx( 2 ) ) / ( yBotSeg( 2 ) - yBotSeg( 1 ) )   ! proportional distance along segment
 
            BotnInt = Bot( IsegBotx,     IsegBoty     )%Noden * ( 1 - s1 ) * ( 1 - s2 ) +  &
                      Bot( IsegBotx + 1, IsegBoty     )%Noden * ( s1     ) * ( 1 - s2 ) +  &
@@ -629,15 +639,25 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
      END IF
 
      ! Has the ray left the box, lost its energy, escaped the boundaries, or exceeded storage limit?
-     !!!! this should be modified to have a single box
-     !!!! no need to test x( 1 ), for instance, against several limits; calculate one limit in advance
+     ! LP: See explanation for changes in bdry3DMod: GetTopSeg3D.
+     t_o( 1 ) = ray2D( is + 1 )%t( 1 ) * tradial( 1 )
+     t_o( 2 ) = ray2D( is + 1 )%t( 1 ) * tradial( 2 )
+     t_o( 3 ) = ray2D( is + 1 )%t( 2 )
+     term_minx = MAX( BotGlobalx( 1            ), TopGlobalx( 1            ) )
+     term_miny = MAX( BotGlobaly( 1            ), TopGlobaly( 1            ) )
+     term_maxx = MIN( BotGlobalx( NBTYPts( 1 ) ), TopGlobalx( NATIPts( 1 ) ) )
+     term_maxy = MIN( BotGlobaly( NBTYPts( 2 ) ), TopGlobaly( NATIPts( 2 ) ) )
      IF ( ABS( x( 1 ) - xs( 1 ) ) > Beam%Box%x .OR. &
           ABS( x( 2 ) - xs( 2 ) ) > Beam%Box%y .OR. &
           ABS( x( 3 ) - xs( 3 ) ) > Beam%Box%z .OR. &
-          x( 1 ) < MAX( BotGlobalx( 1            ), TopGlobalx( 1            ) ) .OR. &
-          x( 2 ) < MAX( BotGlobaly( 1            ), TopGlobaly( 1            ) ) .OR. &
-          x( 1 ) > MIN( BotGlobalx( NBTYPts( 1 ) ), TopGlobalx( NATIPts( 1 ) ) ) .OR. &
-          x( 2 ) > MIN( BotGlobaly( NBTYPts( 2 ) ), TopGlobaly( NATIPts( 2 ) ) ) .OR. &
+          x( 1 ) < term_minx .OR. &
+          x( 2 ) < term_miny .OR. &
+          x( 1 ) > term_maxx .OR. &
+          x( 2 ) > term_maxy .OR. &
+          ( x( 1 ) == term_minx .AND. t_o( 1 ) < 0.0 ) .OR. &
+          ( x( 2 ) == term_miny .AND. t_o( 2 ) < 0.0 ) .OR. &
+          ( x( 1 ) == term_maxx .AND. t_o( 1 ) > 0.0 ) .OR. &
+          ( x( 2 ) == term_maxy .AND. t_o( 2 ) > 0.0 ) .OR. &
           ray2D( is + 1 )%Amp < 0.005 .OR. &
           ray2D( is + 1 )%t( 1 ) < 0  .OR. & ! kills off a backward traveling ray
           iSmallStepCtr > 50 ) THEN
@@ -784,6 +804,7 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
   REAL     (KIND=8) :: z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy
   REAL     (KIND=8) :: tinit( 3 )
   LOGICAL           :: topRefl, botRefl
+  REAL     (KIND=8) :: term_minx, term_miny, term_maxx, term_maxy, term_x( 3 ), term_t( 3 )
 
   ! *** Initial conditions ***
 
@@ -823,8 +844,8 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
   xBotSeg = [ +big, -big ]
   yBotSeg = [ +big, -big ]
     
-  CALL GetTopSeg3D( xs )   ! identify the top    segment above the source
-  CALL GetBotSeg3D( xs )   ! identify the bottom segment below the source
+  CALL GetTopSeg3D( xs, ray3D( 1 )%t )   ! identify the top    segment above the source
+  CALL GetBotSeg3D( xs, ray3D( 1 )%t )   ! identify the bottom segment below the source
   
   ! Trace the beam (note that Reflect alters the step index is)
   is = 0
@@ -841,8 +862,8 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
      is1 = is + 1
 
      CALL Step3D( ray3D( is ), ray3D( is1 ), topRefl, botRefl )
-     CALL GetTopSeg3D( ray3D( is1 )%x )   ! identify the top    segment above the source
-     CALL GetBotSeg3D( ray3D( is1 )%x )   ! identify the bottom segment below the source
+     CALL GetTopSeg3D( ray3D( is1 )%x, ray3D( is1 )%t )   ! identify the top    segment above the source
+     CALL GetBotSeg3D( ray3D( is1 )%x, ray3D( is1 )%t )   ! identify the bottom segment below the source
 
      IF ( IsegTopx == 0 .OR. IsegTopy == 0 .OR. IsegBotx == 0 .OR. IsegBoty == 0 ) THEN ! we escaped the box
         Beam%Nsteps = is
@@ -859,8 +880,8 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
 
      IF ( topRefl ) THEN
         IF ( atiType == 'C' ) THEN
-           s1 = ( ray3D( is1 )%x( 1 ) - Topx( 1 ) ) / Top_deltax   ! proportional distance along segment
-           s2 = ( ray3D( is1 )%x( 2 ) - Topx( 2 ) ) / Top_deltay   ! proportional distance along segment
+           s1 = ( ray3D( is1 )%x( 1 ) - Topx( 1 ) ) / ( xTopSeg( 2 ) - xTopSeg( 1 ) )   ! proportional distance along segment
+           s2 = ( ray3D( is1 )%x( 2 ) - Topx( 2 ) ) / ( yTopSeg( 2 ) - yTopSeg( 1 ) )   ! proportional distance along segment
 
            TopnInt = Top( IsegTopx,     IsegTopy     )%Noden * ( 1 - s1 ) * ( 1 - s2 ) +  &
                      Top( IsegTopx + 1, IsegTopy     )%Noden * ( s1     ) * ( 1 - s2 ) +  &
@@ -891,8 +912,8 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
      ELSE IF ( botRefl ) THEN
 
         IF ( btyType == 'C' ) THEN
-           s1 = ( ray3D( is1 )%x( 1 ) - Botx( 1 ) ) / Bot_deltax   ! proportional distance along segment
-           s2 = ( ray3D( is1 )%x( 2 ) - Botx( 2 ) ) / Bot_deltay   ! proportional distance along segment
+           s1 = ( ray3D( is1 )%x( 1 ) - Botx( 1 ) ) / ( xBotSeg( 2 ) - xBotSeg( 1 ) )   ! proportional distance along segment
+           s2 = ( ray3D( is1 )%x( 2 ) - Botx( 2 ) ) / ( yBotSeg( 2 ) - yBotSeg( 1 ) )   ! proportional distance along segment
 
            BotnInt = Bot( IsegBotx,     IsegBoty     )%Noden * ( 1 - s1 ) * ( 1 - s2 ) +  &
                      Bot( IsegBotx + 1, IsegBoty     )%Noden * ( s1     ) * ( 1 - s2 ) +  &
@@ -923,13 +944,24 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
      END IF
 
      ! Has the ray left the box, lost its energy, escaped the boundaries, or exceeded storage limit?
-     IF ( ABS( ray3D( is + 1 )%x( 1 ) - xs( 1 ) ) > Beam%Box%x .OR. &
-          ABS( ray3D( is + 1 )%x( 2 ) - xs( 2 ) ) > Beam%Box%y .OR. &
-          ABS( ray3D( is + 1 )%x( 3 ) - xs( 3 ) ) > Beam%Box%z .OR. &
-          ray3D( is + 1 )%x( 1 ) < MAX( BotGlobalx( 1            ), TopGlobalx( 1            ) ) .OR. &
-          ray3D( is + 1 )%x( 2 ) < MAX( BotGlobaly( 1            ), TopGlobaly( 1            ) ) .OR. &
-          ray3D( is + 1 )%x( 1 ) > MIN( BotGlobalx( NBTYPts( 1 ) ), TopGlobalx( NATIPts( 1 ) ) ) .OR. &
-          ray3D( is + 1 )%x( 2 ) > MIN( BotGlobaly( NBTYPts( 2 ) ), TopGlobaly( NATIPts( 2 ) ) ) .OR. &
+     ! LP: See explanation for changes in bdry3DMod: GetTopSeg3D.
+     term_x = ray3D( is + 1 )%x
+     term_t = ray3D( is + 1 )%t
+     term_minx = MAX( BotGlobalx( 1            ), TopGlobalx( 1            ) )
+     term_miny = MAX( BotGlobaly( 1            ), TopGlobaly( 1            ) )
+     term_maxx = MIN( BotGlobalx( NBTYPts( 1 ) ), TopGlobalx( NATIPts( 1 ) ) )
+     term_maxy = MIN( BotGlobaly( NBTYPts( 2 ) ), TopGlobaly( NATIPts( 2 ) ) )
+     IF ( ABS( term_x( 1 ) - xs( 1 ) ) > Beam%Box%x .OR. &
+          ABS( term_x( 2 ) - xs( 2 ) ) > Beam%Box%y .OR. &
+          ABS( term_x( 3 ) - xs( 3 ) ) > Beam%Box%z .OR. &
+          term_x( 1 ) < term_minx .OR. &
+          term_x( 2 ) < term_miny .OR. &
+          term_x( 1 ) > term_maxx .OR. &
+          term_x( 2 ) > term_maxy .OR. &
+          ( term_x( 1 ) == term_minx .AND. term_t( 1 ) < 0.0 ) .OR. &
+          ( term_x( 2 ) == term_miny .AND. term_t( 2 ) < 0.0 ) .OR. &
+          ( term_x( 1 ) == term_maxx .AND. term_t( 1 ) > 0.0 ) .OR. &
+          ( term_x( 2 ) == term_maxy .AND. term_t( 2 ) > 0.0 ) .OR. &
           ray3D( is + 1 )%Amp < 0.005 .OR. &
           iSmallStepCtr > 50 ) THEN
         Beam%Nsteps = is + 1
