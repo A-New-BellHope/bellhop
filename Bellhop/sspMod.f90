@@ -491,7 +491,7 @@ END SUBROUTINE EvaluateSSP2D
     REAL      (KIND=8), INTENT( IN  ) :: t( 3 )   ! ray tangent; for edge cases of updating segments
     CHARACTER (LEN =3), INTENT( IN  ) :: Task
     REAL      (KIND=8), INTENT( OUT ) :: c, cimag, gradc( 3 ), cxx, cyy, czz, cxy, cxz, cyz, rho ! sound speed and its derivatives
-    INTEGER                           :: AllocateStatus, iSegxt, iSegyt, iy2, iz2, iSegxTT( 1 ), iSegyTT( 1 ), iSegzTT( 1 )
+    INTEGER                           :: AllocateStatus, iSegxt, iSegyt, iy2, iz2
     REAL      (KIND=8)                :: c1, c2, c11, c12, c21, c22, cz11, cz12, cz21, cz22, cz1, cz2, &
                                          cx, cy, cz, s1, s2, s3
 
@@ -550,7 +550,7 @@ END SUBROUTINE EvaluateSSP2D
        END IF
        
        IF ( SSP%Nz .GE. MaxSSP ) THEN
-          ! LP: SSP%Nz / SSP%Seg%z will get assigned to SSP%z / SSP%NPts.
+          ! LP: SSP%Nz / SSP%Seg%z will get assigned to SSP%NPts / SSP%z.
           CALL ERROUT( 'READIN: Hexahedral', &
                'Number of SSP points in Z exceeds limit' )
        END IF
@@ -603,60 +603,10 @@ END SUBROUTINE EvaluateSSP2D
           CALL ERROUT( 'Hexahedral', 'ray is outside the box where the soundspeed is defined' )
        END IF
 
-       ! check x-segment contains x( 1 ) in [ SSP%Seg%x( iSegx ), SSP%Seg%x( iSegx + 1 ) )
-       !IF ( x( 1 ) <  SSP%Seg%x( iSegx     ) ) iSegx = MAX( 1,          iSegx - 1 )   ! bump left
-       !IF ( x( 1 ) >= SSP%Seg%x( iSegx + 1 ) ) iSegx = MIN( SSP%Nx - 1, iSegx + 1 )   ! bump right
-
-       IF ( x( 1 ) < SSP%Seg%x( iSegx ) .OR. x( 1 ) >= SSP%Seg%x( iSegx + 1 ) ) THEN
-!!$          DO iSegxT = 2, SSP%Nx   ! Search for bracketing segment ranges
-!!$             IF ( x( 1 ) < SSP%Seg%x( iSegxT ) ) THEN
-!!$                iSegx = iSegxT - 1
-!!$                EXIT
-!!$             END IF
-!!$          END DO
-
-          iSegxTT = MAXLOC( SSP%Seg%x( : ), SSP%Seg%x( : ) < x( 1 ) )
-
-          IF ( iSegxTT( 1 ) > 0 .AND. iSegxTT( 1 ) < SSP%Nx ) THEN  ! iSegx MUST LIE IN [ 1, SSP%Nx - 1 ]
-             iSegx = iSegxTT( 1 )   
-          END IF
-
-       END IF
-
-       ! check y-segment contains x( 2 ) in [ SSP%Seg%y( iSegy ), SSP%Seg%y( iSegy + 1 ) )
-       IF ( x( 2 ) < SSP%Seg%y( iSegy ) .OR. x( 2 ) >= SSP%Seg%y( iSegy + 1 ) ) THEN
-!!$          DO iSegyT = 2, SSP%Ny   ! Search for bracketing segment ranges
-!!$             IF ( x( 2 ) < SSP%Seg%y( iSegyT ) ) THEN
-!!$                iSegy = iSegyT - 1
-!!$                EXIT
-!!$             END IF
-!!$          END DO
-
-          iSegyTT = MAXLOC( SSP%Seg%y( : ), SSP%Seg%y( : ) < x( 2 ) )
-
-          IF ( iSegyTT( 1 ) > 0 .AND. iSegyTT( 1 ) < SSP%Ny ) THEN  ! iSegx MUST LIE IN [ 1, SSP%Ny - 1 ]
-             iSegy = iSegyTT( 1 )   
-          END IF
-
-       END IF
-
-       ! check depth-layer contains x( 3 ) in [ SSP%Seg%z( iSegz ), SSP%Seg%z( iSegz + 1 ) ]
-       IF ( x( 3 ) < SSP%Seg%z( iSegz ) .OR. x( 3 ) > SSP%Seg%z( iSegz + 1 ) ) THEN
-!!$          DO iz = 2, SSP%Nz   ! Search for bracketing Depths
-!!$             IF ( x( 3 ) < SSP%Seg%z( iz ) ) THEN
-!!$                iSegz = iz - 1
-!!$                EXIT
-!!$             END IF
-!!$          END DO
-
-          iSegzTT = MAXLOC( SSP%Seg%z( : ), SSP%Seg%z( : ) < x( 3 ) )
-
-          IF ( iSegzTT( 1 ) > 0 .AND. iSegzTT( 1 ) < SSP%Nz ) THEN  ! iSegx MUST LIE IN [ 1, SSP%Nz - 1 ]
-             iSegz = iSegzTT( 1 )   
-          END IF
-
-       END IF
-
+       CALL Update3DXSegmentT( x, t )
+       CALL Update3DYSegmentT( x, t )
+       CALL Update3DZSegmentT( x, t )
+       
        ! cz at the corners of the current rectangle
        cz11 = SSP%czMat3( iSegx,     iSegy    , iSegz )
        cz12 = SSP%czMat3( iSegx + 1, iSegy    , iSegz )
@@ -924,12 +874,10 @@ END SUBROUTINE Analytic3D
   SUBROUTINE UpdateRangeSegmentT( x, t )
      REAL (KIND=8), INTENT(IN) :: x( 2 ), t( 2 )
      
-     ! LP: Handles edge cases based on which direction the ray is going. If the
-     ! ray takes a small step in the direction of t, it will remain in the same
-     ! segment as it is now.
+     ! LP: See UpdateDepthSegmentT
      
      IF ( t( 1 ) >= 0.0 ) THEN
-        ! SSP%z( iSegr ) <= x( 1 ) < SSP%z( iSegr + 1 )
+        ! SSP%Seg%r( iSegr ) <= x( 1 ) < SSP%Seg%r( iSegr + 1 )
         DO WHILE ( x( 1 ) < SSP%Seg%r( iSegr ) .AND. iSegr > 1 )
            iSegr = iSegr - 1
         END DO
@@ -937,12 +885,87 @@ END SUBROUTINE Analytic3D
            iSegr = iSegr + 1
         END DO
      ELSE
-        ! SSP%z( iSegr ) < x( 1 ) <= SSP%z( iSegr + 1 )
+        ! SSP%Seg%r( iSegr ) < x( 1 ) <= SSP%Seg%r( iSegr + 1 )
         DO WHILE ( x( 1 ) > SSP%Seg%r( iSegr + 1 ) .AND. iSegr < SSP%Nr-1 )
            iSegr = iSegr + 1
         END DO
         DO WHILE ( x( 1 ) <= SSP%Seg%r( iSegr ) .AND. iSegr > 1 )
            iSegr = iSegr - 1
+        END DO
+     ENDIF
+     
+  END SUBROUTINE
+  
+  SUBROUTINE Update3DXSegmentT( x, t )
+     REAL (KIND=8), INTENT(IN) :: x( 3 ), t( 3 )
+     
+     ! LP: See UpdateDepthSegmentT
+     
+     IF ( t( 1 ) >= 0.0 ) THEN
+        ! SSP%Seg%x( iSegx ) <= x( 1 ) < SSP%Seg%x( iSegx + 1 )
+        DO WHILE ( x( 1 ) < SSP%Seg%x( iSegx ) .AND. iSegx > 1 )
+           iSegx = iSegx - 1
+        END DO
+        DO WHILE ( x( 1 ) >= SSP%Seg%x( iSegx + 1 ) .AND. iSegx < SSP%Nx-1 )
+           iSegx = iSegx + 1
+        END DO
+     ELSE
+        ! SSP%Seg%x( iSegx ) < x( 1 ) <= SSP%Seg%x( iSegx + 1 )
+        DO WHILE ( x( 1 ) > SSP%Seg%x( iSegx + 1 ) .AND. iSegx < SSP%Nx-1 )
+           iSegx = iSegx + 1
+        END DO
+        DO WHILE ( x( 1 ) <= SSP%Seg%x( iSegx ) .AND. iSegx > 1 )
+           iSegx = iSegx - 1
+        END DO
+     ENDIF
+     
+  END SUBROUTINE
+  
+  SUBROUTINE Update3DYSegmentT( x, t )
+     REAL (KIND=8), INTENT(IN) :: x( 3 ), t( 3 )
+     
+     ! LP: See UpdateDepthSegmentT
+     
+     IF ( t( 2 ) >= 0.0 ) THEN
+        ! SSP%Seg%y( iSegy ) <= x( 2 ) < SSP%Seg%y( iSegy + 1 )
+        DO WHILE ( x( 2 ) < SSP%Seg%y( iSegy ) .AND. iSegy > 1 )
+           iSegy = iSegy - 1
+        END DO
+        DO WHILE ( x( 2 ) >= SSP%Seg%y( iSegy + 1 ) .AND. iSegy < SSP%Ny-1 )
+           iSegy = iSegy + 1
+        END DO
+     ELSE
+        ! SSP%Seg%y( iSegy ) < x( 2 ) <= SSP%Seg%y( iSegy + 1 )
+        DO WHILE ( x( 2 ) > SSP%Seg%y( iSegy + 1 ) .AND. iSegy < SSP%Ny-1 )
+           iSegy = iSegy + 1
+        END DO
+        DO WHILE ( x( 2 ) <= SSP%Seg%y( iSegy ) .AND. iSegy > 1 )
+           iSegy = iSegy - 1
+        END DO
+     ENDIF
+     
+  END SUBROUTINE
+  
+  SUBROUTINE Update3DZSegmentT( x, t )
+     REAL (KIND=8), INTENT(IN) :: x( 3 ), t( 3 )
+     
+     ! LP: See UpdateDepthSegmentT
+     
+     IF ( t( 3 ) >= 0.0 ) THEN
+        ! SSP%Seg%z( iSegz ) <= x( 3 ) < SSP%Seg%z( iSegz + 1 )
+        DO WHILE ( x( 3 ) < SSP%Seg%z( iSegz ) .AND. iSegz > 1 )
+           iSegz = iSegz - 1
+        END DO
+        DO WHILE ( x( 3 ) >= SSP%Seg%z( iSegz + 1 ) .AND. iSegz < SSP%Nz-1 )
+           iSegz = iSegz + 1
+        END DO
+     ELSE
+        ! SSP%Seg%z( iSegz ) < x( 3 ) <= SSP%Seg%z( iSegz + 1 )
+        DO WHILE ( x( 3 ) > SSP%Seg%z( iSegz + 1 ) .AND. iSegz < SSP%Nz-1 )
+           iSegz = iSegz + 1
+        END DO
+        DO WHILE ( x( 3 ) <= SSP%Seg%z( iSegz ) .AND. iSegz > 1 )
+           iSegz = iSegz - 1
         END DO
      ENDIF
      

@@ -365,7 +365,7 @@ CONTAINS
 
     IF ( CheckDiagCrossing( tri_n, d0, d ) ) THEN
        h6 = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       WRITE( PRTFile, * ) 'Tri diag crossing h6', h6
+       WRITE( PRTFile, * ) 'Top tri diag crossing h', h6
     END IF
 
     ! triangle crossing within a bottom segment
@@ -376,7 +376,7 @@ CONTAINS
 
     IF ( CheckDiagCrossing( tri_n, d0, d ) ) THEN
        h7 = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       WRITE( PRTFile, * ) 'Tri diag crossing h7', h7
+       WRITE( PRTFile, * ) 'Bot tri diag crossing h', h7
     END IF
 
     h = MIN( h, h1, h2, h3, h4, h5, h6, h7 )  ! take limit set by shortest distance to a crossing
@@ -503,14 +503,14 @@ CONTAINS
        IF       ( x2( 2 ) < ySeg( 1 ) ) THEN
           h  = -( x0( 2 ) - ySeg( 1 ) ) / urayt( 2 )
           x2 = x0 + h * urayt
-          x2( 1 ) = ySeg( 1 )
+          x2( 2 ) = ySeg( 1 )
           topRefl = .FALSE.
           botRefl = .FALSE.
           WRITE( PRTFile, * ) 'StepToBdry3D Y min bound h to', h, x2
        ELSE IF  ( x2( 2 ) > ySeg( 2 ) ) THEN
           h  = -( x0( 2 ) - ySeg( 2 ) ) / urayt( 2 )
           x2 = x0 + h * urayt
-          x2( 1 ) = ySeg( 2 )
+          x2( 2 ) = ySeg( 2 )
           topRefl = .FALSE.
           botRefl = .FALSE.
           WRITE( PRTFile, * ) 'StepToBdry3D Y max bound h to', h, x2
@@ -535,7 +535,7 @@ CONTAINS
        IF ( k >= 100 ) WRITE( PRTFile, * ) 'EnsureStepOverTriDiagBdry did not converge'
        topRefl = .FALSE.
        botRefl = .FALSE.
-       WRITE( PRTFile, * ) 'StepToBdry3D diagonal crossing h to', h, x2
+       WRITE( PRTFile, * ) 'StepToBdry3D top diagonal crossing h to', h, x2
     END IF
 
     ! triangle crossing within a bottom segment
@@ -556,7 +556,7 @@ CONTAINS
        IF ( k >= 100 ) WRITE( PRTFile, * ) 'EnsureStepOverTriDiagBdry did not converge'
        topRefl = .FALSE.
        botRefl = .FALSE.
-       WRITE( PRTFile, * ) 'StepToBdry3D diagonal crossing h to', h, x2
+       WRITE( PRTFile, * ) 'StepToBdry3D bottom diagonal crossing h to', h, x2
     END IF
 
     IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN        ! is it taking an infinitesimal step?
