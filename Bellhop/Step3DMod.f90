@@ -9,7 +9,7 @@ MODULE Step3DMod
   
 CONTAINS
 
-  SUBROUTINE Step3D( ray0, ray2, topRefl, botRefl )
+  SUBROUTINE Step3D( ray0, ray2, topRefl, botRefl, flipTopDiag, flipBotDiag )
 
     ! Does a single step along the ray
     ! x denotes the ray coordinate, ( x, y, z )
@@ -20,7 +20,7 @@ CONTAINS
 
     ! rays
     TYPE( ray3DPt ) :: ray0, ray1, ray2
-    LOGICAL, INTENT( OUT ) :: topRefl, botRefl
+    LOGICAL, INTENT( OUT ) :: topRefl, botRefl, flipTopDiag, flipBotDiag
     INTEGER         :: iSegx0, iSegy0, iSegz0
     REAL  (KIND=8 ) :: gradc0( 3 ), gradc1( 3 ), gradc2( 3 ), &
          c0, cimag0, csq0, cxx0, cyy0, czz0, cxy0, cxz0, cyz0, cnn0, cmn0, cmm0, &
@@ -88,7 +88,8 @@ CONTAINS
     ! Take the blended ray tangent ( urayt2 ) and find the minimum step size ( h )
     ! to put this on a boundary, and ensure that the resulting position
     ! ( ray2%x ) gets put precisely on the boundary.
-    CALL StepToBdry3D( ray0%x, ray2%x, urayt2, iSegx0, iSegy0, iSegz0, h, topRefl, botRefl )
+    CALL StepToBdry3D( ray0%x, ray2%x, urayt2, iSegx0, iSegy0, iSegz0, h, &
+       topRefl, botRefl, flipTopDiag, flipBotDiag )
     
     ! Update other variables with this new h
     ! LP: Fixed: ray2%phi now depends on hw0 & hw1 like the other parameters,
@@ -362,10 +363,18 @@ CONTAINS
     d     = x  - Topx   ! vector from bottom node to ray end
     d0    = x0 - Topx   ! vector from bottom node to ray origin
     tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ), 0.0d0 ]
+    tri_n = tri_n / NORM2( tri_n )
 
-    IF ( CheckDiagCrossing( tri_n, d0, d ) ) THEN
+    IF ( CheckDiagCrossing( tri_n, d, Top_tridiag_pos ) ) THEN
        h6 = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       WRITE( PRTFile, * ) 'Top tri diag crossing h', h6
+       IF ( h6 < 0.0D0 ) THEN
+          IF ( ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
+             CALL ERROUT( 'ReduceStep3D', 'Bad top tri diag crossing' )
+          END IF
+          h6 = 0.0D0
+       END IF
+       WRITE( PRTFile, * ) 'Top tri diag crossing h dot(n, d0) dot(n, d)', &
+          h6, DOT_PRODUCT( tri_n, d0 ), DOT_PRODUCT( tri_n, d )
     END IF
 
     ! triangle crossing within a bottom segment
@@ -373,14 +382,25 @@ CONTAINS
     d     = x  - Botx   ! vector from bottom node to ray end
     d0    = x0 - Botx   ! vector from bottom node to ray origin
     tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ), 0.0d0 ]
+    tri_n = tri_n / NORM2( tri_n )
 
-    IF ( CheckDiagCrossing( tri_n, d0, d ) ) THEN
+    IF ( CheckDiagCrossing( tri_n, d, Bot_tridiag_pos ) ) THEN
        h7 = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       WRITE( PRTFile, * ) 'Bot tri diag crossing h', h7
+       IF ( h7 < 0.0D0 ) THEN
+          IF ( ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
+             CALL ERROUT( 'ReduceStep3D', 'Bad bot tri diag crossing' )
+          END IF
+          h7 = 0.0D0
+       END IF
+       WRITE( PRTFile, * ) 'Bot tri diag crossing h dot(n, d0) dot(n, d)', &
+          h7, DOT_PRODUCT( tri_n, d0 ), DOT_PRODUCT( tri_n, d )
     END IF
 
     h = MIN( h, h1, h2, h3, h4, h5, h6, h7 )  ! take limit set by shortest distance to a crossing
-
+    IF ( h < -1d-4 ) THEN
+       WRITE( PRTFile, * ) 'ReduceStep3D WARNING: negative h', h
+       CALL ERROUT( 'ReduceStep3D', 'negative h' )
+    END IF
     IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN        ! is it taking an infinitesimal step?
        h = INFINITESIMAL_STEP_SIZE * Beam%deltas                 ! make sure we make some motion
        iSmallStepCtr = iSmallStepCtr + 1   ! keep a count of the number of sequential small steps
@@ -391,15 +411,17 @@ CONTAINS
   
   ! **********************************************************************!
 
-  SUBROUTINE StepToBdry3D( x0, x2, urayt, iSegx0, iSegy0, iSegz0, h, topRefl, botRefl )
+  SUBROUTINE StepToBdry3D( x0, x2, urayt, iSegx0, iSegy0, iSegz0, h, &
+    topRefl, botRefl, flipTopDiag, flipBotDiag )
 
     INTEGER,       INTENT( IN    ) :: iSegx0, iSegy0, iSegz0
     REAL (KIND=8), INTENT( IN    ) :: x0( 3 ), urayt( 3 )  ! ray coordinate and tangent
     REAL (KIND=8), INTENT( INOUT ) :: x2( 3 ), h           ! output coord, reduced step size
-    LOGICAL,       INTENT( OUT   ) :: topRefl, botRefl
+    LOGICAL,       INTENT( OUT   ) :: topRefl, botRefl, flipTopDiag, flipBotDiag
     REAL (KIND=8) :: d( 3 ), d0( 3 ), tri_n( 3 )
     REAL (KIND=8) :: xSeg( 2 ), ySeg( 2 )                  ! boundary limits
     INTEGER                        :: k
+    REAL (KIND=8) :: hnew
 
     ! Original step due to maximum step size
     h = Beam%deltas
@@ -521,42 +543,56 @@ CONTAINS
     d     = x2 - Topx   ! vector from bottom node to ray end
     d0    = x0 - Topx   ! vector from bottom node to ray origin
     tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ), 0.0d0 ]
+    tri_n = tri_n / NORM2( tri_n )
 
-    IF ( CheckDiagCrossing( tri_n, d0, d ) ) THEN
-       h  = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       EnsureStepOverTriDiagTopBdry: DO k = 1, 100
-          x2 = x0 + h * urayt
-          ! LP: Since this is not an exact floating-point value to step
-          ! to, make sure we have stepped over the boundary.
-          IF ( CheckDiagCrossing( tri_n, d0, x2 - Topx ) ) EXIT EnsureStepOverTriDiagTopBdry
-          ! LP: Slightly increase h if not.
-          h = h * 1.000001
-       END DO EnsureStepOverTriDiagTopBdry
-       IF ( k >= 100 ) WRITE( PRTFile, * ) 'EnsureStepOverTriDiagBdry did not converge'
+    IF ( CheckDiagCrossing( tri_n, d, Top_tridiag_pos ) ) THEN
+       hnew = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
+       IF ( hnew < 0.0D0 ) THEN
+          IF ( ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
+             CALL ERROUT( 'StepToBdry3D', 'Bad top tri diag crossing' )
+          END IF
+          h = 0.0D0
+       ELSE
+          IF ( hnew >= h ) THEN
+             CALL ERROUT( 'StepToBdry3D', 'Bad 2 top tri diag crossing' )
+          END IF
+          h = hnew
+       END IF
+       x2 = x0 + h * urayt
+       WRITE( PRTFile, * ) 'StepToBdry3D top diagonal crossing h to', h, x2
        topRefl = .FALSE.
        botRefl = .FALSE.
-       WRITE( PRTFile, * ) 'StepToBdry3D top diagonal crossing h to', h, x2
+       flipTopDiag = .TRUE.
+    ELSE
+       flipTopDiag = .FALSE.
     END IF
 
     ! triangle crossing within a bottom segment
     d     = x2 - Botx   ! vector from bottom node to ray end
     d0    = x0 - Botx   ! vector from bottom node to ray origin
     tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ), 0.0d0 ]
+    tri_n = tri_n / NORM2( tri_n )
 
-    IF ( CheckDiagCrossing( tri_n, d0, d ) ) THEN
-       h  = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       EnsureStepOverTriDiagBotBdry: DO k = 1, 100
-          x2 = x0 + h * urayt
-          ! LP: Since this is not an exact floating-point value to step
-          ! to, make sure we have stepped over the boundary.
-          IF ( CheckDiagCrossing( tri_n, d0, x2 - Botx ) ) EXIT EnsureStepOverTriDiagBotBdry
-          ! LP: Slightly increase h if not.
-          h = h * 1.000001
-       END DO EnsureStepOverTriDiagBotBdry
-       IF ( k >= 100 ) WRITE( PRTFile, * ) 'EnsureStepOverTriDiagBdry did not converge'
+    IF ( CheckDiagCrossing( tri_n, d, Bot_tridiag_pos ) ) THEN
+       hnew = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
+       IF ( hnew < 0.0D0 ) THEN
+          IF ( ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
+             CALL ERROUT( 'StepToBdry3D', 'Bad bot tri diag crossing' )
+          END IF
+          h = 0.0D0
+       ELSE
+          IF ( hnew >= h ) THEN
+             CALL ERROUT( 'StepToBdry3D', 'Bad 2 bot tri diag crossing' )
+          END IF
+          h = hnew
+       END IF
+       x2 = x0 + h * urayt
+       WRITE( PRTFile, * ) 'StepToBdry3D bottom diagonal crossing h to', h, x2
        topRefl = .FALSE.
        botRefl = .FALSE.
-       WRITE( PRTFile, * ) 'StepToBdry3D bottom diagonal crossing h to', h, x2
+       flipBotDiag = .TRUE.
+    ELSE
+       flipBotDiag = .FALSE.
     END IF
 
     IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN        ! is it taking an infinitesimal step?
@@ -567,6 +603,8 @@ CONTAINS
        d = x2 - Topx ! vector from top to ray
        IF ( DOT_PRODUCT( Topn, d ) > EPSILON( d( 1 ) ) ) THEN
           topRefl = .TRUE.
+          flipTopDiag = .FALSE.
+          flipBotDiag = .FALSE.
        ELSE
           topRefl = .FALSE.
        END IF
@@ -574,18 +612,23 @@ CONTAINS
        IF ( DOT_PRODUCT( Botn, d ) > EPSILON( d( 1 ) ) ) THEN
           botRefl = .TRUE.
           topRefl = .FALSE.
+          flipTopDiag = .FALSE.
+          flipBotDiag = .FALSE.
        ELSE
           botRefl = .FALSE.
        END IF
     END IF
   END SUBROUTINE StepToBdry3D
 
-  LOGICAL FUNCTION CheckDiagCrossing( tri_n, d0, d )
-    REAL (KIND=8), INTENT( IN ) :: d( 3 ), d0( 3 ), tri_n( 3 )
+  LOGICAL FUNCTION CheckDiagCrossing( tri_n, d, tridiag_pos )
+    REAL (KIND=8), INTENT( IN ) :: tri_n( 3 ), d( 3 )
+    LOGICAL, INTENT( IN ) :: tridiag_pos
+    REAL (KIND=8) :: dend
     
-    CheckDiagCrossing = &
-       ( DOT_PRODUCT( tri_n, d0 ) > 0.0d0 .AND. DOT_PRODUCT( tri_n, d ) <= 0.0d0 ) .OR. &
-       ( DOT_PRODUCT( tri_n, d0 ) < 0.0d0 .AND. DOT_PRODUCT( tri_n, d ) >= 0.0d0 )
+    dend = DOT_PRODUCT( tri_n, d )
+    
+    CheckDiagCrossing = ( tridiag_pos .AND. dend < -TRIDIAG_THRESH ) &
+             .OR. ( .NOT. tridiag_pos .AND. dend >  TRIDIAG_THRESH )
   END FUNCTION CheckDiagCrossing
 
 END MODULE Step3DMod

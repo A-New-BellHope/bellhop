@@ -486,6 +486,7 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
   REAL     (KIND=8) :: tinit( 2 ), tradial( 2 ), BotnInt( 3 ), TopnInt( 3 ), s1, s2
   REAL     (KIND=8) :: z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy
   REAL     (KIND=8) :: term_minx, term_miny, term_maxx, term_maxy
+  LOGICAL           :: flipTopDiag, flipBotDiag
 
   ! *** Initial conditions ***
 
@@ -511,8 +512,8 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
   t_o( 1 ) = ray2D( 1 )%t( 1 ) * tradial( 1 )
   t_o( 2 ) = ray2D( 1 )%t( 1 ) * tradial( 2 )
   t_o( 3 ) = ray2D( 1 )%t( 2 )
-  CALL GetTopSeg3D( xs, t_o )   ! identify the top    segment above the source
-  CALL GetBotSeg3D( xs, t_o )   ! identify the bottom segment below the source
+  CALL GetTopSeg3D( xs, t_o, .TRUE. )   ! identify the top    segment above the source
+  CALL GetBotSeg3D( xs, t_o, .TRUE. )   ! identify the bottom segment below the source
 
   ! Trace the beam (note that Reflect alters the step index is)
   is = 0
@@ -536,9 +537,11 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
      t_o( 1 ) = ray2D( is1 )%t( 1 ) * tradial( 1 )
      t_o( 2 ) = ray2D( is1 )%t( 1 ) * tradial( 2 )
      t_o( 3 ) = ray2D( is1 )%t( 2 )
-
-     CALL GetTopSeg3D( x, t_o )    ! identify the top    segment above the source
-     CALL GetBotSeg3D( x, t_o )    ! identify the bottom segment below the source
+     
+     IF ( flipTopDiag ) Top_tridiag_pos = .NOT. Top_tridiag_pos
+     IF ( flipBotDiag ) Bot_tridiag_pos = .NOT. Bot_tridiag_pos
+     CALL GetTopSeg3D( x, t_o, .FALSE. )    ! identify the top    segment above the source
+     CALL GetBotSeg3D( x, t_o, .FALSE. )    ! identify the bottom segment below the source
 
      IF ( IsegTopx == 0 .OR. IsegTopy == 0 .OR. IsegBotx == 0 .OR. IsegBoty == 0 ) THEN ! we escaped the box
         Beam%Nsteps = is
@@ -803,7 +806,7 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
   REAL     (KIND=8) :: s1, s2
   REAL     (KIND=8) :: z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy
   REAL     (KIND=8) :: tinit( 3 )
-  LOGICAL           :: topRefl, botRefl
+  LOGICAL           :: topRefl, botRefl, flipTopDiag, flipBotDiag
   REAL     (KIND=8) :: term_minx, term_miny, term_maxx, term_maxy, term_x( 3 ), term_t( 3 )
 
   ! *** Initial conditions ***
@@ -844,8 +847,8 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
   xBotSeg = [ +big, -big ]
   yBotSeg = [ +big, -big ]
     
-  CALL GetTopSeg3D( xs, ray3D( 1 )%t )   ! identify the top    segment above the source
-  CALL GetBotSeg3D( xs, ray3D( 1 )%t )   ! identify the bottom segment below the source
+  CALL GetTopSeg3D( xs, ray3D( 1 )%t, .TRUE. )   ! identify the top    segment above the source
+  CALL GetBotSeg3D( xs, ray3D( 1 )%t, .TRUE. )   ! identify the bottom segment below the source
   
   ! Trace the beam (note that Reflect alters the step index is)
   is = 0
@@ -861,9 +864,12 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
      is  = is + 1
      is1 = is + 1
 
-     CALL Step3D( ray3D( is ), ray3D( is1 ), topRefl, botRefl )
-     CALL GetTopSeg3D( ray3D( is1 )%x, ray3D( is1 )%t )   ! identify the top    segment above the source
-     CALL GetBotSeg3D( ray3D( is1 )%x, ray3D( is1 )%t )   ! identify the bottom segment below the source
+     CALL Step3D( ray3D( is ), ray3D( is1 ), topRefl, botRefl, flipTopDiag, flipBotDiag )
+     
+     IF ( flipTopDiag ) Top_tridiag_pos = .NOT. Top_tridiag_pos
+     IF ( flipBotDiag ) Bot_tridiag_pos = .NOT. Bot_tridiag_pos
+     CALL GetTopSeg3D( ray3D( is1 )%x, ray3D( is1 )%t, .FALSE. )   ! identify the top    segment above the source
+     CALL GetBotSeg3D( ray3D( is1 )%x, ray3D( is1 )%t, .FALSE. )   ! identify the bottom segment below the source
 
      IF ( IsegTopx == 0 .OR. IsegTopy == 0 .OR. IsegBotx == 0 .OR. IsegBoty == 0 ) THEN ! we escaped the box
         Beam%Nsteps = is

@@ -22,6 +22,8 @@ MODULE bdry3Dmod
   REAL (KIND=8) :: xTopseg( 2 ), yTopseg( 2 ), xBotseg( 2 ), yBotseg( 2 ), &
        Topx( 3 ), Botx( 3 ), &   ! coordinates of corner of active rectangle
        Topn( 3 ), Botn( 3 )      ! tangent and normal    of active triangle
+  LOGICAL            :: Top_tridiag_pos, Bot_tridiag_pos ! whether in positive / n2 triangle
+  REAL (KIND=8), PARAMETER :: TRIDIAG_THRESH = 3D-6
   REAL (KIND=8), PARAMETER :: big = 1E25                  ! large number used for domain termination when no altimetry/bathymetry given
 
   CHARACTER  (LEN=1) :: atiType, btyType
@@ -318,7 +320,7 @@ CONTAINS
 
   ! **********************************************************************!
 
-  SUBROUTINE GetTopSeg3D( x, t )
+  SUBROUTINE GetTopSeg3D( x, t, isInit )
 
     ! Get the Top segment info (index and range interval) for XY position, x
     ! sets Topx and Topn
@@ -345,8 +347,10 @@ CONTAINS
 
     INTEGER, PARAMETER :: PRTFile = 6
     REAL (KIND=8), INTENT( IN ) :: x( 3 ), t( 3 )
+    LOGICAL,       INTENT( IN ) :: isInit
     INTEGER :: nx, ny
     REAL (KIND=8) :: Top_tri_n( 2 )   ! triangle normals
+    REAL (KIND=8) :: over_diag_amount
     
     nx = NatiPts( 1 )
     ny = NatiPts( 2 )
@@ -404,7 +408,12 @@ CONTAINS
     ! identify the normal based on the active triangle of a pair
     ! normal of triangle side pointing up and to the left
     Top_tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ) ]
-    IF ( DOT_PRODUCT( x( 1 : 2 ) - Top( IsegTopx, IsegTopy )%x( 1 : 2 ), Top_tri_n ) < 0 ) THEN
+    Top_tri_n = Top_tri_n / NORM2( Top_tri_n )
+    over_diag_amount = DOT_PRODUCT( x( 1 : 2 ) - Top( IsegTopx, IsegTopy )%x( 1 : 2 ), Top_tri_n )
+    IF ( isInit .OR. ABS( over_diag_amount ) > TRIDIAG_THRESH ) THEN
+       Top_tridiag_pos = ( over_diag_amount >= 0.0D0 )
+    END IF
+    IF ( .NOT. Top_tridiag_pos ) THEN
       Topn = Top( IsegTopx, IsegTopy )%n1
     ELSE
       Topn = Top( IsegTopx, IsegTopy )%n2
@@ -420,7 +429,7 @@ CONTAINS
 
   ! **********************************************************************!
 
-  SUBROUTINE GetBotSeg3D( x, t )
+  SUBROUTINE GetBotSeg3D( x, t, isInit )
     
     ! Get the Bottom segment info (index and range interval) for XY position, x
     ! sets Botx and Botn
@@ -428,8 +437,10 @@ CONTAINS
     
     INTEGER, PARAMETER :: PRTFile = 6
     REAL (KIND=8), INTENT( IN ) :: x( 3 ), t( 3 )
+    LOGICAL,       INTENT( IN ) :: isInit
     INTEGER :: nx, ny
     REAL (KIND=8) :: Bot_tri_n( 2 )   ! triangle normals
+    REAL (KIND=8) :: over_diag_amount
     
     nx = NbtyPts( 1 )
     ny = NbtyPts( 2 )
@@ -483,11 +494,16 @@ CONTAINS
     yBotSeg  = [ Bot( 1, IsegBoty )%x( 2 ), Bot( 1, IsegBoty + 1 )%x( 2 ) ]   ! segment limits in range
     
     Botx = Bot( IsegBotx, IsegBoty )%x
-
+    
     ! identify the normal based on the active triangle of a pair
     ! normal of triangle side pointing up and to the left
     Bot_tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ) ]
-    IF ( DOT_PRODUCT( x( 1 : 2 ) - Bot( IsegBotx, IsegBoty )%x( 1 : 2 ), Bot_tri_n ) < 0 ) THEN
+    Bot_tri_n = Bot_tri_n / NORM2( Bot_tri_n )
+    over_diag_amount = DOT_PRODUCT( x( 1 : 2 ) - Bot( IsegBotx, IsegBoty )%x( 1 : 2 ), Bot_tri_n )
+    IF ( isInit .OR. ABS( over_diag_amount ) > TRIDIAG_THRESH ) THEN
+       Bot_tridiag_pos = ( over_diag_amount >= 0.0D0 )
+    END IF
+    IF ( .NOT. Bot_tridiag_pos ) THEN
       Botn = Bot( IsegBotx, IsegBoty )%n1
     ELSE
       Botn = Bot( IsegBotx, IsegBoty )%n2
