@@ -400,18 +400,25 @@ CONTAINS
        IsegTopy = MIN( MAX( IsegTopy, 1 ), ny - 1 )
     END IF
     
+    
     xTopSeg  = [ Top( IsegTopx, 1 )%x( 1 ), Top( IsegTopx + 1, 1 )%x( 1 ) ]   ! segment limits in range
     yTopSeg  = [ Top( 1, IsegTopy )%x( 2 ), Top( 1, IsegTopy + 1 )%x( 2 ) ]   ! segment limits in range
     
     Topx = Top( IsegTopx, IsegTopy )%x
+    
+    ! WRITE( PRTFile, * ) 'IsegTop', IsegTopx, IsegTopy
+    ! WRITE( PRTFile, * ) 'Topx x', Topx, x
 
     ! identify the normal based on the active triangle of a pair
     ! normal of triangle side pointing up and to the left
     Top_tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ) ]
     Top_tri_n = Top_tri_n / NORM2( Top_tri_n )
-    over_diag_amount = DOT_PRODUCT( x( 1 : 2 ) - Top( IsegTopx, IsegTopy )%x( 1 : 2 ), Top_tri_n )
-    IF ( isInit .OR. ABS( over_diag_amount ) > TRIDIAG_THRESH ) THEN
+    over_diag_amount = DOT_PRODUCT( x( 1 : 2 ) - Topx( 1 : 2 ), Top_tri_n )
+    ! WRITE( PRTFile, * ) 'Top_tri_n over_diag_amount', Top_tri_n, over_diag_amount
+    IF ( ABS( over_diag_amount ) > TRIDIAG_THRESH ) THEN
        Top_tridiag_pos = ( over_diag_amount >= 0.0D0 )
+    ELSE IF ( isInit ) THEN
+       Top_tridiag_pos = DOT_PRODUCT( t( 1 : 2 ), Top_tri_n ) >= 0.0D0
     END IF
     IF ( .NOT. Top_tridiag_pos ) THEN
       Topn = Top( IsegTopx, IsegTopy )%n1
@@ -490,6 +497,8 @@ CONTAINS
        IsegBoty = MIN( MAX( IsegBoty, 1 ), ny - 1 )
     END IF
     
+    ! WRITE( PRTFile, * ) 'IsegBot', IsegBotx, IsegBoty
+    
     xBotSeg  = [ Bot( IsegBotx, 1 )%x( 1 ), Bot( IsegBotx + 1, 1 )%x( 1 ) ]   ! segment limits in range
     yBotSeg  = [ Bot( 1, IsegBoty )%x( 2 ), Bot( 1, IsegBoty + 1 )%x( 2 ) ]   ! segment limits in range
     
@@ -499,9 +508,11 @@ CONTAINS
     ! normal of triangle side pointing up and to the left
     Bot_tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ) ]
     Bot_tri_n = Bot_tri_n / NORM2( Bot_tri_n )
-    over_diag_amount = DOT_PRODUCT( x( 1 : 2 ) - Bot( IsegBotx, IsegBoty )%x( 1 : 2 ), Bot_tri_n )
-    IF ( isInit .OR. ABS( over_diag_amount ) > TRIDIAG_THRESH ) THEN
+    over_diag_amount = DOT_PRODUCT( x( 1 : 2 ) - Botx( 1 : 2 ), Bot_tri_n )
+    IF ( ABS( over_diag_amount ) > TRIDIAG_THRESH ) THEN
        Bot_tridiag_pos = ( over_diag_amount >= 0.0D0 )
+    ELSE IF ( isInit ) THEN
+       Bot_tridiag_pos = DOT_PRODUCT( t( 1 : 2 ), Bot_tri_n ) >= 0.0D0
     END IF
     IF ( .NOT. Bot_tridiag_pos ) THEN
       Botn = Bot( IsegBotx, IsegBoty )%n1

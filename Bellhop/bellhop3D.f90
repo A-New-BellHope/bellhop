@@ -229,7 +229,7 @@ SUBROUTINE BellhopCore
                     IF ( Angles%iSingle_alpha == 0 .OR. ialpha == Angles%iSingle_alpha ) THEN    ! Single beam run?
                     !IF ( ialpha  == 11 .or. ialpha == 12 ) THEN    ! Single beam run?
 
-                       !WRITE( PRTFile, FMT = "( '   Tracing declination beam ', I4, F10.2 )" ) ialpha, SrcDeclAngle
+                       WRITE( PRTFile, FMT = "( '   Tracing declination beam ', I4, F10.2 )" ) ialpha, SrcDeclAngle
                        !write( *, * ) '    ialpha', ialpha, SrcDeclAngle
 
                        IBPvec = maxloc( SrcBmPat( :, 1 ), mask = SrcBmPat( :, 1 ) < SrcDeclAngle )  ! index of ray angle in beam pattern

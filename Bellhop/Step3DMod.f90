@@ -6,6 +6,7 @@ MODULE Step3DMod
   IMPLICIT NONE
   
   REAL (KIND=8), PARAMETER, PRIVATE :: INFINITESIMAL_STEP_SIZE = 1.0d-6
+  LOGICAL, PARAMETER, PRIVATE :: STEP_DEBUGGING = .FALSE.
   
 CONTAINS
 
@@ -36,9 +37,11 @@ CONTAINS
     REAL  (KIND=8 ) :: p_tilde_in(  2 ), p_hat_in(  2 ), q_tilde_in(  2 ), q_hat_in(  2 ), &
          p_tilde_out( 2 ), p_hat_out( 2 ), RotMat( 2, 2 )
          
-    WRITE( PRTFile, * )
-    WRITE( PRTFile, * ) 'ray0 x t', ray0%x, ray0%t
-    WRITE( PRTFile, * ) 'iSegx iSegy iSegz', iSegx, iSegy, iSegz
+    IF ( STEP_DEBUGGING ) THEN
+       WRITE( PRTFile, * )
+       WRITE( PRTFile, * ) 'ray0 x t', ray0%x, ray0%t
+       WRITE( PRTFile, * ) 'iSegx iSegy iSegz', iSegx, iSegy, iSegz
+    END IF
            
     ! The numerical integrator used here is a version of the polygon (a.k.a. midpoint, leapfrog, or Box method), and similar
     ! to the Heun (second order Runge-Kutta method).
@@ -274,6 +277,9 @@ CONTAINS
     REAL (KIND=8) :: h1, h2, h3, h4, h5, h6, h7          ! step sizes
     REAL (KIND=8) :: xSeg( 2 ), ySeg( 2 )
 
+    IF ( STEP_DEBUGGING ) &
+       WRITE( PRTFile, * ) 'ReduceStep3D'
+
     ! Detect interface or boundary crossing and reduce step, if necessary, to land on that crossing.
     ! Keep in mind possibility that user put source right on an interface
     ! and that multiple events can occur (crossing interface, top, and bottom in a single step).
@@ -288,10 +294,12 @@ CONTAINS
     IF ( ABS( urayt( 3 ) ) > EPSILON( h1 ) ) THEN
        IF      ( SSP%z( iSegz0     ) > x(  3 ) .AND. iSegz0     > 1  ) THEN
           h1 = ( SSP%z( iSegz0     ) - x0( 3 ) ) / urayt( 3 )
-          WRITE( PRTFile, * ) 'Shallower bound SSP Z > z; h', SSP%z( iSegz0     ), x( 3 ), h1
+          IF ( STEP_DEBUGGING ) &
+             WRITE( PRTFile, * ) 'Shallower bound SSP Z > z; h', SSP%z( iSegz0     ), x( 3 ), h1
        ELSE IF ( SSP%z( iSegz0 + 1 ) < x(  3 ) .AND. iSegz0 + 1 < SSP%Nz ) THEN
           h1 = ( SSP%z( iSegz0 + 1 ) - x0( 3 ) ) / urayt( 3 )
-          WRITE( PRTFile, * ) 'Deeper bound SSP Z < z; h', SSP%z( iSegz0 + 1 ), x( 3 ), h1
+          IF ( STEP_DEBUGGING ) &
+             WRITE( PRTFile, * ) 'Deeper bound SSP Z < z; h', SSP%z( iSegz0 + 1 ), x( 3 ), h1
        END IF
     END IF
 
@@ -303,7 +311,8 @@ CONTAINS
     IF ( DOT_PRODUCT( Topn, d )  >= 0.0D0 ) THEN
        d0 = x0 - Topx   ! vector from top    node to ray origin
        h2 = -DOT_PRODUCT( d0, Topn ) / DOT_PRODUCT( urayt, Topn )
-       WRITE( PRTFile, * ) 'Top crossing h', h2
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'Top crossing h', h2
     END IF
 
     ! bottom crossing
@@ -314,7 +323,8 @@ CONTAINS
     IF ( DOT_PRODUCT( Botn, d ) >= 0.0D0 ) THEN
        d0 = x0 - Botx   ! vector from bottom node to ray origin
        h3 = -DOT_PRODUCT( d0, Botn ) / DOT_PRODUCT( urayt, Botn )
-       WRITE( PRTFile, * ) 'Bottom crossing h', h3
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'Bottom crossing h', h3
     END IF
 
     ! top/bottom segment crossing in x
@@ -330,10 +340,12 @@ CONTAINS
     IF ( ABS( urayt( 1 ) ) > EPSILON( h1 ) ) THEN
        IF       ( x(  1 ) < xSeg( 1 ) ) THEN
           h4 = -( x0( 1 ) - xSeg( 1 ) ) / urayt( 1 )
-          WRITE( PRTFile, * ) 'Min bound SSP X > x; h', xSeg( 1 ), x( 1 ), h4
+          IF ( STEP_DEBUGGING ) &
+             WRITE( PRTFile, * ) 'Min bound SSP X > x; h', xSeg( 1 ), x( 1 ), h4
        ELSE IF  ( x(  1 ) > xSeg( 2 ) ) THEN
           h4 = -( x0( 1 ) - xSeg( 2 ) ) / urayt( 1 )
-          WRITE( PRTFile, * ) 'Max bound SSP X < x; h', xSeg( 2 ), x( 1 ), h4
+          IF ( STEP_DEBUGGING ) &
+             WRITE( PRTFile, * ) 'Max bound SSP X < x; h', xSeg( 2 ), x( 1 ), h4
        END IF
     END IF
 
@@ -351,10 +363,12 @@ CONTAINS
     IF ( ABS( urayt( 2 ) ) > EPSILON( h1 ) ) THEN
        IF       ( x(  2 ) < ySeg( 1 ) ) THEN
           h5 = -( x0( 2 ) - ySeg( 1 ) ) / urayt( 2 )
-          WRITE( PRTFile, * ) 'Min bound SSP Y > y; h', ySeg( 1 ), x( 2 ), h5
+          IF ( STEP_DEBUGGING ) &
+             WRITE( PRTFile, * ) 'Min bound SSP Y > y; h', ySeg( 1 ), x( 2 ), h5
        ELSE IF  ( x(  2 ) > ySeg( 2 ) ) THEN
           h5 = -( x0( 2 ) - ySeg( 2 ) ) / urayt( 2 )
-          WRITE( PRTFile, * ) 'Max bound SSP Y < y; h', ySeg( 2 ), x( 2 ), h5
+          IF ( STEP_DEBUGGING ) &
+             WRITE( PRTFile, * ) 'Max bound SSP Y < y; h', ySeg( 2 ), x( 2 ), h5
        END IF
     END IF
 
@@ -373,7 +387,8 @@ CONTAINS
           END IF
           h6 = 0.0D0
        END IF
-       WRITE( PRTFile, * ) 'Top tri diag crossing h dot(n, d0) dot(n, d)', &
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'Top tri diag crossing h dot(n, d0) dot(n, d)', &
           h6, DOT_PRODUCT( tri_n, d0 ), DOT_PRODUCT( tri_n, d )
     END IF
 
@@ -392,13 +407,13 @@ CONTAINS
           END IF
           h7 = 0.0D0
        END IF
-       WRITE( PRTFile, * ) 'Bot tri diag crossing h dot(n, d0) dot(n, d)', &
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'Bot tri diag crossing h dot(n, d0) dot(n, d)', &
           h7, DOT_PRODUCT( tri_n, d0 ), DOT_PRODUCT( tri_n, d )
     END IF
 
     h = MIN( h, h1, h2, h3, h4, h5, h6, h7 )  ! take limit set by shortest distance to a crossing
     IF ( h < -1d-4 ) THEN
-       WRITE( PRTFile, * ) 'ReduceStep3D WARNING: negative h', h
        CALL ERROUT( 'ReduceStep3D', 'negative h' )
     END IF
     IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN        ! is it taking an infinitesimal step?
@@ -433,12 +448,14 @@ CONTAINS
           h  = ( SSP%z( iSegz0     ) - x0( 3 ) ) / urayt( 3 )
           x2 = x0 + h * urayt
           x2( 3 ) = SSP%z( iSegz0 )
-          WRITE( PRTFile, * ) 'StepToBdry3D shallower h to', h, x2
+          IF ( STEP_DEBUGGING ) &
+             WRITE( PRTFile, * ) 'StepToBdry3D shallower h to', h, x2
        ELSE IF ( SSP%z( iSegz0 + 1 ) < x2( 3 ) .AND. iSegz0 + 1 < SSP%Nz ) THEN
           h  = ( SSP%z( iSegz0 + 1 ) - x0( 3 ) ) / urayt( 3 )
           x2 = x0 + h * urayt
           x2( 3 ) = SSP%z( iSegz0 + 1 )
-          WRITE( PRTFile, * ) 'StepToBdry3D deeper h to', h, x2
+          IF ( STEP_DEBUGGING ) &
+             WRITE( PRTFile, * ) 'StepToBdry3D deeper h to', h, x2
        END IF
     END IF
 
@@ -457,7 +474,8 @@ CONTAINS
        IF ( ABS( Topn( 1 ) ) < EPSILON( Topn( 1 ) ) .AND. ABS( Topn( 2 ) ) < EPSILON( Topn( 2 ) ) ) THEN
           x2( 3 ) = Topx( 3 )
        END IF
-       WRITE( PRTFile, * ) 'StepToBdry3D top crossing h to', h, x2
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'StepToBdry3D top crossing h to', h, x2
        topRefl = .TRUE.
     ELSE
        topRefl = .FALSE.
@@ -475,7 +493,8 @@ CONTAINS
        IF ( ABS( Botn( 1 ) ) < EPSILON( Botn( 1 ) ) .AND. ABS( Botn( 2 ) ) < EPSILON( Botn( 2 ) ) ) THEN
           x2( 3 ) = Botx( 3 )
        END IF
-       WRITE( PRTFile, * ) 'StepToBdry3D bottom crossing h to', h, x2
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'StepToBdry3D bottom crossing h to', h, x2
        botRefl = .TRUE.
        ! Should not ever be able to cross both, but in case it does, make sure
        ! only the crossing we exactly landed on is active
@@ -500,14 +519,16 @@ CONTAINS
           x2( 1 ) = xSeg( 1 )
           topRefl = .FALSE.
           botRefl = .FALSE.
-          WRITE( PRTFile, * ) 'StepToBdry3D X min bound h to', h, x2
+          IF ( STEP_DEBUGGING ) &
+             WRITE( PRTFile, * ) 'StepToBdry3D X min bound h to', h, x2
        ELSE IF  ( x2( 1 ) > xSeg( 2 ) ) THEN
           h  = -( x0( 1 ) - xSeg( 2 ) ) / urayt( 1 )
           x2 = x0 + h * urayt
           x2( 1 ) = xSeg( 2 )
           topRefl = .FALSE.
           botRefl = .FALSE.
-          WRITE( PRTFile, * ) 'StepToBdry3D X max bound h to', h, x2
+          IF ( STEP_DEBUGGING ) &
+             WRITE( PRTFile, * ) 'StepToBdry3D X max bound h to', h, x2
        END IF
     END IF
 
@@ -528,14 +549,16 @@ CONTAINS
           x2( 2 ) = ySeg( 1 )
           topRefl = .FALSE.
           botRefl = .FALSE.
-          WRITE( PRTFile, * ) 'StepToBdry3D Y min bound h to', h, x2
+          IF ( STEP_DEBUGGING ) &
+             WRITE( PRTFile, * ) 'StepToBdry3D Y min bound h to', h, x2
        ELSE IF  ( x2( 2 ) > ySeg( 2 ) ) THEN
           h  = -( x0( 2 ) - ySeg( 2 ) ) / urayt( 2 )
           x2 = x0 + h * urayt
           x2( 2 ) = ySeg( 2 )
           topRefl = .FALSE.
           botRefl = .FALSE.
-          WRITE( PRTFile, * ) 'StepToBdry3D Y max bound h to', h, x2
+          IF ( STEP_DEBUGGING ) &
+             WRITE( PRTFile, * ) 'StepToBdry3D Y max bound h to', h, x2
        END IF
     END IF
 
@@ -559,7 +582,8 @@ CONTAINS
           h = hnew
        END IF
        x2 = x0 + h * urayt
-       WRITE( PRTFile, * ) 'StepToBdry3D top diagonal crossing h to', h, x2
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'StepToBdry3D top diagonal crossing h to', h, x2
        topRefl = .FALSE.
        botRefl = .FALSE.
        flipTopDiag = .TRUE.
@@ -587,7 +611,8 @@ CONTAINS
           h = hnew
        END IF
        x2 = x0 + h * urayt
-       WRITE( PRTFile, * ) 'StepToBdry3D bottom diagonal crossing h to', h, x2
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'StepToBdry3D bottom diagonal crossing h to', h, x2
        topRefl = .FALSE.
        botRefl = .FALSE.
        flipBotDiag = .TRUE.
@@ -598,7 +623,8 @@ CONTAINS
     IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN        ! is it taking an infinitesimal step?
        h = INFINITESIMAL_STEP_SIZE * Beam%deltas                 ! make sure we make some motion
        x2 = x0 + h * urayt
-       WRITE( PRTFile, * ) 'StepToBdry3D small step forced h to ', h, x2
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'StepToBdry3D small step forced h to ', h, x2
        ! Recheck reflection conditions
        d = x2 - Topx ! vector from top to ray
        IF ( DOT_PRODUCT( Topn, d ) > EPSILON( d( 1 ) ) ) THEN
@@ -626,6 +652,7 @@ CONTAINS
     REAL (KIND=8) :: dend
     
     dend = DOT_PRODUCT( tri_n, d )
+    ! WRITE( PRTFile, * ) 'pos dend', tridiag_pos, dend
     
     CheckDiagCrossing = ( tridiag_pos .AND. dend < -TRIDIAG_THRESH ) &
              .OR. ( .NOT. tridiag_pos .AND. dend >  TRIDIAG_THRESH )
