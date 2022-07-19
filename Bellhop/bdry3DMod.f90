@@ -11,6 +11,7 @@ MODULE bdry3Dmod
   ! Len = length of tangent (temporary variable to normalize tangent)
 
   USE SubTabulate
+  USE monotonicMod
   USE FatalError
 
   IMPLICIT NONE
@@ -25,10 +26,10 @@ MODULE bdry3Dmod
   LOGICAL            :: Top_tridiag_pos, Bot_tridiag_pos ! whether in positive / n2 triangle
   REAL (KIND=8), PARAMETER :: TRIDIAG_THRESH = 3D-6
   REAL (KIND=8), PARAMETER :: big = 1E25                  ! large number used for domain termination when no altimetry/bathymetry given
+  !big = sqrt( huge( Top( 1, 1 )%x ) ) / 1.0d5
 
   CHARACTER  (LEN=1) :: atiType, btyType
 
-  REAL (KIND=8), ALLOCATABLE :: BotGlobalx( : ), BotGlobaly( : ), TopGlobalx( : ), TopGlobaly( : )
   TYPE BdryPt
      REAL (KIND=8) :: x( 3 ), t( 3 ), n( 3 ), n1( 3 ), n2( 3 ), Len, Noden( 3 ), Noden_unscaled( 3 ), z_xx, z_xy, z_yy, &
           phi_xx, phi_xy, phi_yy, kappa_xx, kappa_xy, kappa_yy
@@ -45,6 +46,7 @@ CONTAINS
     REAL      (KIND=8), INTENT( IN ) :: DepthT        ! Nominal top depth
     CHARACTER (LEN=80), INTENT( IN ) :: FileRoot
     REAL (KIND=8), ALLOCATABLE :: Temp( : )
+    REAL (KIND=8), ALLOCATABLE :: TopGlobalx( : ), TopGlobaly( : )
 
     SELECT CASE ( TopATI )
     CASE ( '~', '*' )
@@ -74,13 +76,16 @@ CONTAINS
 
        ALLOCATE( TopGlobalx( MAX( NatiPts( 1 ), 3 ) ), Stat = IAllocStat )
        IF ( IAllocStat /= 0 ) &
-            CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Insufficient memory for altimetry data: reduce # ati points' )
+          CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Insufficient memory for altimetry data: reduce # ati points' )
 
        TopGlobalx( 3 ) = -999.9
        READ(  ATIFile, * ) TopGlobalx( 1 : NatiPts( 1 ) )
        CALL SubTab( TopGlobalx, NatiPts( 1 ) )
        WRITE( PRTFile, "( 5G14.6 )" ) ( TopGlobalx( ix ), ix = 1, MIN( NatiPts( 1 ), Number_to_Echo ) )
        IF ( NatiPts( 1 ) > Number_to_Echo ) WRITE( PRTFile, "( G14.6 )" ) ' ... ', TopGlobalx( NatiPts( 1 ) )
+       IF ( .NOT. monotonic( TopGlobalx, NatiPts( 1 ) ) ) THEN
+          CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Altimetry X values are not monotonically increasing' )
+       END IF
 
        ! y values
        READ(  ATIFile, * ) NatiPts( 2 )
@@ -89,13 +94,16 @@ CONTAINS
 
        ALLOCATE( TopGlobaly( MAX( NatiPts( 2 ), 3 ) ), Stat = IAllocStat )
        IF ( IAllocStat /= 0 ) &
-            CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Insufficient memory for altimetry data: reduce # ati points' )
+          CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Insufficient memory for altimetry data: reduce # ati points' )
 
        TopGlobaly( 3 ) = -999.9
        READ(  ATIFile, * ) TopGlobaly( 1 : NatiPts( 2 ) )
        CALL SubTab( TopGlobaly, NatiPts( 2 ) )
        WRITE( PRTFile, "( 5G14.6 )" ) ( TopGlobaly( iy ), iy = 1, MIN( NatiPts( 2 ), Number_to_Echo ) )
        IF ( NatiPts( 2 ) > Number_to_Echo ) WRITE( PRTFile, "( G14.6 )"  ) ' ... ', TopGlobaly( NatiPts( 2 ) )
+       IF ( .NOT. monotonic( TopGlobaly, NatiPts( 2 ) ) ) THEN
+          CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Altimetry Y values are not monotonically increasing' )
+       END IF
 
        TopGlobalx = 1000. * TopGlobalx   ! convert km to m
        TopGlobaly = 1000. * TopGlobaly
@@ -130,26 +138,17 @@ CONTAINS
              Top( ix, iy )%x( 2 ) = TopGlobaly( iy )
           END DO
        END DO
+       
+       DEALLOCATE( TopGlobalx )
+       DEALLOCATE( TopGlobaly )
 
        CALL ComputeBdryTangentNormal( Top, 'Top' )
 
     CASE DEFAULT   ! no altimetry given, use SSP depth for flat top
        atiType = 'R'
        NatiPts = [ 2, 2 ]
-       ALLOCATE( TopGlobalx( 2 ), Stat = IAllocStat )
-       IF ( IAllocStat /= 0 ) CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Insufficient memory' )
-       ALLOCATE( TopGlobaly( 2 ), Stat = IAllocStat )
-       IF ( IAllocStat /= 0 ) CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Insufficient memory' )
        ALLOCATE( Top( 2, 2 ), Stat = IAllocStat )
        IF ( IAllocStat /= 0 ) CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Insufficient memory'  )
-
-       !big = sqrt( huge( Top( 1, 1 )%x ) ) / 1.0d5
-
-       TopGlobalx( 1 ) = -big
-       TopGlobalx( 2 ) = +big
-
-       TopGlobaly( 1 ) = -big
-       TopGlobaly( 2 ) = +big
 
        Top( 1, 1 )%x = [ -big, -big, DepthT ]
        Top( 1, 2 )%x = [ -big,  big, DepthT ]
@@ -187,6 +186,7 @@ CONTAINS
     REAL      (KIND=8), INTENT( IN ) :: DepthB        ! Nominal bottom depth
     CHARACTER (LEN=80), INTENT( IN ) :: FileRoot
     REAL (KIND=8), ALLOCATABLE :: Temp( : )
+    REAL (KIND=8), ALLOCATABLE :: BotGlobalx( : ), BotGlobaly( : )
  
     SELECT CASE ( BotBTY )
     CASE ( '~', '*' )
@@ -224,6 +224,9 @@ CONTAINS
        CALL SubTab( BotGlobalx, NbtyPts( 1 ) )
        WRITE( PRTFile, "( 5G14.6 )" ) ( BotGlobalx( ix ), ix = 1, MIN( NbtyPts( 1 ), Number_to_Echo ) )
        IF ( NbtyPts( 1 ) > Number_to_Echo ) WRITE( PRTFile, "( G14.6 )" ) ' ... ', BotGlobalx( NbtyPts( 1 ) )
+       IF ( .NOT. monotonic( BotGlobalx, NbtyPts( 1 ) ) ) THEN
+          CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Bathymetry X values are not monotonically increasing' )
+       END IF
 
        ! y values
        READ(  BTYFile, * ) NbtyPts( 2 )
@@ -239,6 +242,9 @@ CONTAINS
        CALL SubTab( BotGlobaly, NbtyPts( 2 ) )
        WRITE( PRTFile, "( 5G14.6 )" ) ( BotGlobaly( iy ), iy = 1, MIN( NbtyPts( 2 ), Number_to_Echo ) )
        IF ( NbtyPts( 2 ) > Number_to_Echo ) WRITE( PRTFile, "( G14.6 )" ) ' ... ', BotGlobaly( NbtyPts( 2 ) )
+       IF ( .NOT. monotonic( BotGlobaly, NbtyPts( 2 ) ) ) THEN
+          CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Bathymetry Y values are not monotonically increasing' )
+       END IF
 
        BotGlobalx = 1000. * BotGlobalx   ! convert km to m
        BotGlobaly = 1000. * BotGlobaly
@@ -272,25 +278,16 @@ CONTAINS
              Bot( ix, iy )%x( 2 ) = BotGlobaly( iy )
           END DO
        END DO
+       
+       DEALLOCATE( BotGlobalx )
+       DEALLOCATE( BotGlobaly )
 
        CALL ComputeBdryTangentNormal( Bot, 'Bot' )
     CASE DEFAULT   ! no bathymetry given, use SSP depth for flat bottom
        btyType = 'R'
        NbtyPts = [ 2, 2 ]
-       ALLOCATE( BotGlobalx( 2 ), Stat = IAllocStat )
-       IF ( IAllocStat /= 0 ) CALL ERROUT( 'BELLHOP3D:ReadBTY3D', 'Insufficient memory' )
-       ALLOCATE( BotGlobaly( 2 ), Stat = IAllocStat )
-       IF ( IAllocStat /= 0 ) CALL ERROUT( 'BELLHOP3D:ReadBTY3D', 'Insufficient memory' )
        ALLOCATE( Bot( 2, 2 ), Stat = IAllocStat )
        IF ( IAllocStat /= 0 ) CALL ERROUT( 'BELLHOP', 'Insufficient memory'  )
-
-       ! big = sqrt( huge( Bot( 1, 1 )%x ) ) / 1.0d5
-
-       BotGlobalx( 1 ) = -big
-       BotGlobalx( 2 ) = +big
-
-       BotGlobaly( 1 ) = -big
-       BotGlobaly( 2 ) = +big
 
        Bot( 1, 1 )%x = [ -big, -big, DepthB ]
        Bot( 1, 2 )%x = [ -big,  big, DepthB ]
@@ -421,9 +418,9 @@ CONTAINS
        Top_tridiag_pos = DOT_PRODUCT( t( 1 : 2 ), Top_tri_n ) >= 0.0D0
     END IF
     IF ( .NOT. Top_tridiag_pos ) THEN
-      Topn = Top( IsegTopx, IsegTopy )%n1
+       Topn = Top( IsegTopx, IsegTopy )%n1
     ELSE
-      Topn = Top( IsegTopx, IsegTopy )%n2
+       Topn = Top( IsegTopx, IsegTopy )%n2
     END IF
 
     ! if the Bot depth is bad (a NaN) then error out
@@ -515,9 +512,9 @@ CONTAINS
        Bot_tridiag_pos = DOT_PRODUCT( t( 1 : 2 ), Bot_tri_n ) >= 0.0D0
     END IF
     IF ( .NOT. Bot_tridiag_pos ) THEN
-      Botn = Bot( IsegBotx, IsegBoty )%n1
+       Botn = Bot( IsegBotx, IsegBoty )%n1
     ELSE
-      Botn = Bot( IsegBotx, IsegBoty )%n2
+       Botn = Bot( IsegBotx, IsegBoty )%n2
     END IF
 
     ! if the Bot depth is bad (a NaN) then error out

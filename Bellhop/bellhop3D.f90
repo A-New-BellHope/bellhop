@@ -646,10 +646,10 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
      t_o( 1 ) = ray2D( is + 1 )%t( 1 ) * tradial( 1 )
      t_o( 2 ) = ray2D( is + 1 )%t( 1 ) * tradial( 2 )
      t_o( 3 ) = ray2D( is + 1 )%t( 2 )
-     term_minx = MAX( BotGlobalx( 1            ), TopGlobalx( 1            ) )
-     term_miny = MAX( BotGlobaly( 1            ), TopGlobaly( 1            ) )
-     term_maxx = MIN( BotGlobalx( NBTYPts( 1 ) ), TopGlobalx( NATIPts( 1 ) ) )
-     term_maxy = MIN( BotGlobaly( NBTYPts( 2 ) ), TopGlobaly( NATIPts( 2 ) ) )
+     term_minx = MAX( Bot( 1,            1 )%x( 1 ), Top( 1,            1 )%x( 1 ) )
+     term_miny = MAX( Bot( 1,            1 )%x( 2 ), Top( 1,            1 )%x( 2 ) )
+     term_maxx = MIN( Bot( NBTYPts( 1 ), 1 )%x( 1 ), Top( NATIPts( 1 ), 1 )%x( 1 ) )
+     term_maxy = MIN( Bot( 1, NBTYPts( 2 ) )%x( 2 ), Top( 1, NATIPts( 2 ) )%x( 2 ) )
      IF ( ABS( x( 1 ) - xs( 1 ) ) > Beam%Box%x .OR. &
           ABS( x( 2 ) - xs( 2 ) ) > Beam%Box%y .OR. &
           ABS( x( 3 ) - xs( 3 ) ) > Beam%Box%z .OR. &
@@ -857,6 +857,7 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
 
   IF ( DistBegTop <= 0 .OR. DistBegBot <= 0 ) THEN
      Beam%Nsteps = 1
+     WRITE( PRTFile, * ) 'Terminating the ray trace because the source is on or outside the boundaries'
      RETURN       ! source must be within the medium
   END IF
 
@@ -953,10 +954,10 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
      ! LP: See explanation for changes in bdry3DMod: GetTopSeg3D.
      term_x = ray3D( is + 1 )%x
      term_t = ray3D( is + 1 )%t
-     term_minx = MAX( BotGlobalx( 1            ), TopGlobalx( 1            ) )
-     term_miny = MAX( BotGlobaly( 1            ), TopGlobaly( 1            ) )
-     term_maxx = MIN( BotGlobalx( NBTYPts( 1 ) ), TopGlobalx( NATIPts( 1 ) ) )
-     term_maxy = MIN( BotGlobaly( NBTYPts( 2 ) ), TopGlobaly( NATIPts( 2 ) ) )
+     term_minx = MAX( Bot( 1,            1 )%x( 1 ), Top( 1,            1 )%x( 1 ) )
+     term_miny = MAX( Bot( 1,            1 )%x( 2 ), Top( 1,            1 )%x( 2 ) )
+     term_maxx = MIN( Bot( NBTYPts( 1 ), 1 )%x( 1 ), Top( NATIPts( 1 ), 1 )%x( 1 ) )
+     term_maxy = MIN( Bot( 1, NBTYPts( 2 ) )%x( 2 ), Top( 1, NATIPts( 2 ) )%x( 2 ) )
      IF ( ABS( term_x( 1 ) - xs( 1 ) ) > Beam%Box%x .OR. &
           ABS( term_x( 2 ) - xs( 2 ) ) > Beam%Box%y .OR. &
           ABS( term_x( 3 ) - xs( 3 ) ) > Beam%Box%z .OR. &
