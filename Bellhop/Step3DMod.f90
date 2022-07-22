@@ -374,8 +374,8 @@ CONTAINS
 
     ! triangle crossing within a top segment
     h6    = huge( h6 )
-    d     = x  - Topx   ! vector from bottom node to ray end
-    d0    = x0 - Topx   ! vector from bottom node to ray origin
+    d     = x  - Topxmid   ! vector from bottom center to ray end
+    d0    = x0 - Topxmid   ! vector from bottom center to ray origin
     tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ), 0.0d0 ]
     tri_n = tri_n / NORM2( tri_n )
 
@@ -394,8 +394,8 @@ CONTAINS
 
     ! triangle crossing within a bottom segment
     h7    = huge( h7 )
-    d     = x  - Botx   ! vector from bottom node to ray end
-    d0    = x0 - Botx   ! vector from bottom node to ray origin
+    d     = x  - Botxmid   ! vector from bottom center to ray end
+    d0    = x0 - Botxmid   ! vector from bottom center to ray origin
     tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ), 0.0d0 ]
     tri_n = tri_n / NORM2( tri_n )
 
@@ -461,7 +461,6 @@ CONTAINS
 
     ! top crossing
     d  = x2 - Topx ! vector from top to ray
-    d0 = x0 - Topx ! vector from top node to ray origin
     ! LP: Originally, this value had to be > a small positive number, meaning the
     ! new step really had to be outside the boundary, not just to the boundary.
     ! Also, this is not missing a normalization factor, Topn is normalized so
@@ -483,7 +482,6 @@ CONTAINS
 
     ! bottom crossing
     d  = x2 - Botx ! vector from bottom to ray
-    d0 = x0 - Botx ! vector from bottom node to ray origin
     ! LP: See comment above for top case.
     IF ( DOT_PRODUCT( Botn, d ) > -INFINITESIMAL_STEP_SIZE ) THEN
        d0 = x0 - Botx   ! vector from bottom node to ray origin
@@ -563,8 +561,8 @@ CONTAINS
     END IF
 
     ! triangle crossing within a top segment
-    d     = x2 - Topx   ! vector from bottom node to ray end
-    d0    = x0 - Topx   ! vector from bottom node to ray origin
+    d     = x2 - Topxmid   ! vector from bottom center to ray end
+    d0    = x0 - Topxmid   ! vector from bottom center to ray origin
     tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ), 0.0d0 ]
     tri_n = tri_n / NORM2( tri_n )
 
@@ -592,8 +590,8 @@ CONTAINS
     END IF
 
     ! triangle crossing within a bottom segment
-    d     = x2 - Botx   ! vector from bottom node to ray end
-    d0    = x0 - Botx   ! vector from bottom node to ray origin
+    d     = x2 - Botxmid   ! vector from bottom center to ray end
+    d0    = x0 - Botxmid   ! vector from bottom center to ray origin
     tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ), 0.0d0 ]
     tri_n = tri_n / NORM2( tri_n )
 

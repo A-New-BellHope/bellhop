@@ -22,7 +22,9 @@ MODULE bdry3Dmod
   INTEGER            :: ix, iy, IOStat, IAllocStat, iSmallStepCtr = 0
   REAL (KIND=8) :: xTopseg( 2 ), yTopseg( 2 ), xBotseg( 2 ), yBotseg( 2 ), &
        Topx( 3 ), Botx( 3 ), &   ! coordinates of corner of active rectangle
-       Topn( 3 ), Botn( 3 )      ! tangent and normal    of active triangle
+       Topn( 3 ), Botn( 3 ), &   ! tangent and normal    of active triangle
+       Topxmid( 3 ), Botxmid( 3 ) ! coordinates of center of active rectangle
+       ! because corners may be at big number and mess up floating point precision
   LOGICAL            :: Top_tridiag_pos, Bot_tridiag_pos ! whether in positive / n2 triangle
   REAL (KIND=8), PARAMETER :: TRIDIAG_THRESH = 3D-6
   REAL (KIND=8), PARAMETER :: big = 1E25                  ! large number used for domain termination when no altimetry/bathymetry given
@@ -402,6 +404,7 @@ CONTAINS
     yTopSeg  = [ Top( 1, IsegTopy )%x( 2 ), Top( 1, IsegTopy + 1 )%x( 2 ) ]   ! segment limits in range
     
     Topx = Top( IsegTopx, IsegTopy )%x
+    Topxmid = ( Topx + Top( IsegTopx + 1, IsegTopy + 1 )%x ) * 0.5D0
     
     ! WRITE( PRTFile, * ) 'IsegTop', IsegTopx, IsegTopy
     ! WRITE( PRTFile, * ) 'Topx x', Topx, x
@@ -410,7 +413,7 @@ CONTAINS
     ! normal of triangle side pointing up and to the left
     Top_tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ) ]
     Top_tri_n = Top_tri_n / NORM2( Top_tri_n )
-    over_diag_amount = DOT_PRODUCT( x( 1 : 2 ) - Topx( 1 : 2 ), Top_tri_n )
+    over_diag_amount = DOT_PRODUCT( x( 1 : 2 ) - Topxmid( 1 : 2 ), Top_tri_n )
     ! WRITE( PRTFile, * ) 'Top_tri_n over_diag_amount', Top_tri_n, over_diag_amount
     IF ( ABS( over_diag_amount ) > TRIDIAG_THRESH ) THEN
        Top_tridiag_pos = ( over_diag_amount >= 0.0D0 )
@@ -500,12 +503,13 @@ CONTAINS
     yBotSeg  = [ Bot( 1, IsegBoty )%x( 2 ), Bot( 1, IsegBoty + 1 )%x( 2 ) ]   ! segment limits in range
     
     Botx = Bot( IsegBotx, IsegBoty )%x
+    Botxmid = ( Botx + Bot( IsegBotx + 1, IsegBoty + 1 )%x ) * 0.5D0
     
     ! identify the normal based on the active triangle of a pair
     ! normal of triangle side pointing up and to the left
     Bot_tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ) ]
     Bot_tri_n = Bot_tri_n / NORM2( Bot_tri_n )
-    over_diag_amount = DOT_PRODUCT( x( 1 : 2 ) - Botx( 1 : 2 ), Bot_tri_n )
+    over_diag_amount = DOT_PRODUCT( x( 1 : 2 ) - Botxmid( 1 : 2 ), Bot_tri_n )
     IF ( ABS( over_diag_amount ) > TRIDIAG_THRESH ) THEN
        Bot_tridiag_pos = ( over_diag_amount >= 0.0D0 )
     ELSE IF ( isInit ) THEN
