@@ -619,7 +619,7 @@ END SUBROUTINE EvaluateSSP2D
        c21 = SSP%cMat3( iSegx + 1, iSegy    , iSegz ) + s3 * cz12
        c12 = SSP%cMat3( iSegx,     iSegy + 1, iSegz ) + s3 * cz21
        c22 = SSP%cMat3( iSegx + 1, iSegy + 1, iSegz ) + s3 * cz22
-
+       
        ! s1 = proportional distance of x( 1 ) in x
        s1 = ( x( 1 ) - SSP%Seg%x( iSegx ) ) / ( SSP%Seg%x( iSegx + 1 ) - SSP%Seg%x( iSegx ) )
        s1 = MIN( s1, 1.0D0 )   ! force piecewise constant extrapolation for points outside the box

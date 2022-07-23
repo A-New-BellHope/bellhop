@@ -382,7 +382,7 @@ CONTAINS
     IF ( CheckDiagCrossing( tri_n, d, Top_tridiag_pos ) ) THEN
        h6 = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
        IF ( h6 < 0.0D0 ) THEN
-          IF ( ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
+          IF ( h6 <= -1.0D-3 .AND. ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
              CALL ERROUT( 'ReduceStep3D', 'Bad top tri diag crossing' )
           END IF
           h6 = 0.0D0
@@ -402,7 +402,8 @@ CONTAINS
     IF ( CheckDiagCrossing( tri_n, d, Bot_tridiag_pos ) ) THEN
        h7 = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
        IF ( h7 < 0.0D0 ) THEN
-          IF ( ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
+          IF ( h7 <= -1.0D-3 .AND. ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
+             ! WRITE( PRTFile, * ) 'h7 dot', h7, DOT_PRODUCT( urayt, tri_n )
              CALL ERROUT( 'ReduceStep3D', 'Bad bot tri diag crossing' )
           END IF
           h7 = 0.0D0
@@ -569,7 +570,7 @@ CONTAINS
     IF ( CheckDiagCrossing( tri_n, d, Top_tridiag_pos ) ) THEN
        hnew = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
        IF ( hnew < 0.0D0 ) THEN
-          IF ( ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
+          IF ( hnew <= -1.0D-3 .AND. ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
              CALL ERROUT( 'StepToBdry3D', 'Bad top tri diag crossing' )
           END IF
           h = 0.0D0
@@ -598,7 +599,7 @@ CONTAINS
     IF ( CheckDiagCrossing( tri_n, d, Bot_tridiag_pos ) ) THEN
        hnew = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
        IF ( hnew < 0.0D0 ) THEN
-          IF ( ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
+          IF ( hnew <= -1.0D-3 .AND. ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
              CALL ERROUT( 'StepToBdry3D', 'Bad bot tri diag crossing' )
           END IF
           h = 0.0D0
