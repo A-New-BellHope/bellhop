@@ -849,13 +849,22 @@ CONTAINS
   
   ! **********************************************************************!
   
-  SUBROUTINE FinalPhase( )
+  SUBROUTINE FinalPhase( isGaussian )
+    LOGICAL, INTENT( IN ) :: isGaussian
+    INTEGER :: phaseStepNum
     
     ! phase shifts at caustics
     !!! this should be precomputed
     ! LP: The ray point phase is discarded if the condition is met, is this correct?
+    ! LP: Gaussian reads the phase from the current point, all others (including 3D)
+    ! read the phase from the previous point, is this correct?
+    IF ( isGaussian ) THEN
+       phaseStepNum = iS
+    ELSE
+       phaseStepNum = iS - 1
+    END IF
     
-    phaseInt = ray2D( iS )%Phase + phase
+    phaseInt = ray2D( phaseStepNum )%Phase + phase
     IF ( IsAtCaustic( .TRUE. ) ) &
        phaseInt = phase + pi / 2.
     

@@ -163,6 +163,7 @@ CONTAINS
     Det_QOld = ray3D( 1 )%DetQ   ! used to track phase changes at caustics (rotations of Det_Q)
 
     ! Compute nearest rcvr before normal
+    ! LP: This is silly, the ray always starts at the source so this is always 0
     rA  = NORM2( ray3D( 1 )%x( 1 : 2 ) - xs( 1 : 2 ) )         ! range of ray point
     irT = MINLOC( Pos%Rr( 1 : Pos%NRr ), MASK = Pos%Rr( 1 : Pos%NRr ) .GT. rA )        ! index of receiver
     ir  = irT( 1 )
@@ -174,6 +175,15 @@ CONTAINS
        IF ( ABS( rB - rA ) > 1.0D3 * SPACING( rA ) ) THEN   ! jump to next step if duplicate point
           ! initialize the index of the receiver range
           IF ( is == 2 ) THEN
+             ! LP: This is also silly because:
+             ! - rB >= 0 because it's a norm
+             ! - on this step, rA = 0
+             ! - if rB also = 0, then the duplicate condition would mean we never get here
+             ! So this means the overall behavior is:
+             ! - if the first step is not a duplicate, always start from rcvr range idx 1
+             !   regardless of whether there are receivers at 0.0 or not
+             ! - if the first step is a duplicate, skip the first receivers if
+             !   they are at 0 range
              IF ( rB > rA ) THEN   ! ray is moving outward in range
                 ir = 1             ! index all the way in
              ELSE                  ! ray is moving inward in range
@@ -234,6 +244,8 @@ CONTAINS
                       IF ( s < 0D0 ) CYCLE Radials
 
                       ! calculate z-limits for the beam (could be pre-cacluated for each itheta)
+                      ! LP: mbp seems to have realized only some of these components were being used
+                      ! and is only calculating the needed ones, but still storing all of them
                       e_theta      = [ -t_rcvr( 2, itheta ), t_rcvr( 1, itheta ), 0.0D0 ]  ! normal to the vertical receiver plane
                       ! n_ray_z    = CROSS_PRODUCT( rayt, e_theta )                        ! normal to the ray in the vertical receiver plane
                       n_ray_z( 3 ) = rayt( 1 ) * e_theta( 2 ) - rayt( 2 ) * e_theta( 1 )   ! normal to the ray in the vertical receiver plane
@@ -504,6 +516,7 @@ CONTAINS
     Det_QOld = ray3D( 1 )%DetQ   ! used to track phase changes at caustics (rotations of Det_Q)
 
     ! Compute nearest rcvr before normal
+    ! LP: Same issues as hat cart.
     rA  = NORM2( ray3D( 1 )%x( 1 : 2 ) - xs( 1 : 2 ) )         ! range of ray point
     irT = MINLOC( Pos%Rr( 1 : Pos%NRr ), MASK = Pos%Rr( 1 : Pos%NRr ) .GT. rA )   ! index of receiver
     ir  = irT( 1 )

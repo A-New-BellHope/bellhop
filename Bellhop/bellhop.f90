@@ -246,6 +246,7 @@ SUBROUTINE BellhopCore
      ! the missing initialization caused the initial state of one ray to be
      ! dependent on the final state of the previous ray, which is obviously
      ! non-physical.
+     ! This initialization is here in addition to TraceRay2D because of EvaluateSSP.
      iSegz = 1
      iSegr = 1
      
