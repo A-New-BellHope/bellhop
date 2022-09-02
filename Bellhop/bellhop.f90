@@ -370,6 +370,8 @@ COMPLEX (KIND=8 ) FUNCTION PickEpsilon( BeamType, omega, c, gradc, alpha, Dalpha
   REAL      (KIND=8) :: cz
   COMPLEX   (KIND=8) :: epsilonOpt
   CHARACTER (LEN=40) :: TAG
+  
+  ! LP: BUG: Multiple codepaths do not set epsilonOpt, leads to UB
 
   SELECT CASE ( BeamType( 1 : 1 ) )
   CASE ( 'C', 'R' )
@@ -394,7 +396,7 @@ COMPLEX (KIND=8 ) FUNCTION PickEpsilon( BeamType, omega, c, gradc, alpha, Dalpha
         ENDIF
      END SELECT
 
-  CASE ( 'G', 'g' )
+  CASE ( 'G', 'g' ) ! LP: BUG: Missing ^
      TAG        = 'Geometric hat beams'
      halfwidth  = 2.0 / ( ( omega / c ) * Dalpha )
      epsilonOpt = i * 0.5 * omega * halfwidth ** 2

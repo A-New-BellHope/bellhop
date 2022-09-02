@@ -389,7 +389,7 @@ CONTAINS
                 const    = ray2D( iS )%Amp / SQRT( ABS( q ) ) 
                 W        = ( L - n ) / L   ! hat function: 1 on center, 0 on edge
                 Amp      = const * W
-                CALL FinalPhase( )
+                CALL FinalPhase( .FALSE. )
 
                 CALL ApplyContribution( U( iz, ir ) )
              END IF
@@ -483,7 +483,7 @@ CONTAINS
                    const    = Ratio1 * SQRT( ray2D( iS )%c / ABS( q ) ) * ray2D( iS )%Amp
                    W        = ( RadiusMax - n ) / RadiusMax   ! hat function: 1 on center, 0 on edge
                    Amp      = const * W
-                   CALL FinalPhase( )
+                   CALL FinalPhase( .FALSE. )
 
                    CALL ApplyContribution( U( iz, ir ) )
                 END IF
@@ -611,7 +611,7 @@ CONTAINS
                    const    = Ratio1 * SQRT( ray2D( iS )%c / ABS( q ) ) * ray2D( iS )%Amp
                    W        = EXP( -0.5 * ( n / sigma ) ** 2 ) / ( sigma * A )   ! Gaussian decay
                    Amp      = const * W
-                   CALL FinalPhase( )
+                   CALL FinalPhase( .TRUE. )
 
                    CALL ApplyContribution( U( iz, ir ) )
                 END IF
@@ -713,6 +713,8 @@ CONTAINS
           SINT  = ( iS - 1 ) * Beam%deltas + W * Beam%deltas
 
           CALL IncPhaseIfCaustic( .FALSE. )
+          
+          ! WRITE( PRTFile, * ) 'is ir', is-2, ir-1
 
           RcvrDepths: DO iz = 1, NRz_per_range
              deltaz =  Pos%Rz( iz ) - x( 2 )   ! ray to rcvr distance

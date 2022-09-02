@@ -411,6 +411,8 @@ SUBROUTINE PickEpsilon( BeamType, omega, c, Dalpha, Dbeta, rLoop, EpsMultiplier,
   REAL      (KIND=8) :: HalfWidth( 2 ) = [ 0.0, 0.0 ]
   COMPLEX   (KIND=8) :: epsilonOpt( 2 )
   CHARACTER (LEN=80) :: TAG
+  
+  ! LP: BUG: Multiple codepaths do not set epsilonOpt, leads to UB
 
   SELECT CASE ( BeamType( 1 : 1 ) )
   CASE ( 'C', 'R' )   ! Cerveny beams

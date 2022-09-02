@@ -5,6 +5,8 @@ MODULE Step
   IMPLICIT NONE
   
   REAL (KIND=8), PARAMETER, PRIVATE :: INFINITESIMAL_STEP_SIZE = 1.0d-6
+  LOGICAL, PARAMETER, PRIVATE :: STEP_DEBUGGING = .FALSE.
+  
 CONTAINS
 
   SUBROUTINE Step2D( ray0, ray2, topRefl, botRefl, Topx, Topn, Botx, Botn )
@@ -27,12 +29,14 @@ CONTAINS
     REAL (KIND=8 ) :: urayt2( 2 ), unitdt( 2 ), unitdp( 2 ), unitdq( 2 )
     COMPLEX (KIND=8 ) :: unitdtau
     
-    ! WRITE( PRTFile, * )
-    ! WRITE( PRTFile, * ) 'ray0 x t p q tau amp', ray0%x, ray0%t, ray0%p, ray0%q, ray0%tau, ray0%Amp
-    ! WRITE( PRTFile, * ) 'iSegz iSegr', iSegz, iSegr
+    IF ( STEP_DEBUGGING ) THEN
+       WRITE( PRTFile, * )
+       WRITE( PRTFile, * ) 'ray0 x t p q tau amp', ray0%x, ray0%t, ray0%p, ray0%q, ray0%tau, ray0%Amp
+       WRITE( PRTFile, * ) 'iSegr iSegz', iSegr, iSegz
+    END IF
     
-    ! IF ( ray0%x( 1 ) > 16800.0 ) THEN
-    !    STOP 'Enough'
+    ! IF ( ray0%x( 2 ) > 1500.0 ) THEN
+    ! STOP 'Enough'
     ! END IF
 
     ! The numerical integrator used here is a version of the polygon (a.k.a. midpoint, leapfrog, or Box method), and similar
@@ -229,12 +233,16 @@ CONTAINS
           h  = ( SSP%z( iSegz0     ) - x0( 2 ) ) / urayt( 2 )
           x2( 1 ) = x0( 1 ) + h * urayt( 1 )
           x2( 2 ) = SSP%z( iSegz0 )
-          ! WRITE( PRTFile, * ) 'StepToBdry2D lower depth h to', h, x2
+          IF ( STEP_DEBUGGING ) THEN
+             WRITE( PRTFile, * ) 'StepToBdry2D lower depth h to', h, x2
+          END IF
        ELSE IF ( SSP%z( iSegz0 + 1 ) < x2( 2 ) ) THEN
           h  = ( SSP%z( iSegz0 + 1 ) - x0( 2 ) ) / urayt( 2 )
           x2( 1 ) = x0( 1 ) + h * urayt( 1 )
           x2( 2 ) = SSP%z( iSegz0 + 1 )
-          ! WRITE( PRTFile, * ) 'StepToBdry2D upper depth h to', h, x2
+          IF ( STEP_DEBUGGING ) THEN
+             WRITE( PRTFile, * ) 'StepToBdry2D upper depth h to', h, x2
+          END IF
        END IF
     END IF
 
@@ -252,7 +260,9 @@ CONTAINS
        IF ( ABS( Topn( 1 ) ) < EPSILON( Topn( 1 ) ) ) THEN
           x2( 2 ) = Topx( 2 )
        END IF
-       ! WRITE( PRTFile, * ) 'StepToBdry2D top crossing h to', h, x2
+       IF ( STEP_DEBUGGING ) THEN
+          WRITE( PRTFile, * ) 'StepToBdry2D top crossing h to', h, x2
+       END IF
        topRefl = .TRUE.
     ELSE
        topRefl = .FALSE.
@@ -269,7 +279,9 @@ CONTAINS
        IF ( ABS( Botn( 1 ) ) < EPSILON( Botn( 1 ) ) ) THEN
           x2( 2 ) = Botx( 2 )
        END IF
-       ! WRITE( PRTFile, * ) 'StepToBdry2D bottom crossing h to', h, x2
+       IF ( STEP_DEBUGGING ) THEN
+          WRITE( PRTFile, * ) 'StepToBdry2D bottom crossing h to', h, x2
+       END IF
        botRefl = .TRUE.
        ! Should not ever be able to cross both, but in case it does, make sure
        ! only the crossing we exactly landed on is active
@@ -292,14 +304,18 @@ CONTAINS
           h = -( x0( 1 ) - rSeg( 1 ) ) / urayt( 1 )
           x2( 1 ) = rSeg( 1 )
           x2( 2 ) = x0( 2 ) + h * urayt( 2 )
-          ! WRITE( PRTFile, * ) 'StepToBdry2D lower range h to', h, x2
+          IF ( STEP_DEBUGGING ) THEN
+             WRITE( PRTFile, * ) 'StepToBdry2D lower range h to', h, x2
+          END IF
           topRefl = .FALSE.
           botRefl = .FALSE.
        ELSE IF ( x2( 1 ) > rSeg( 2 ) ) THEN
           h = -( x0( 1 ) - rSeg( 2 ) ) / urayt( 1 )
           x2( 1 ) = rSeg( 2 )
           x2( 2 ) = x0( 2 ) + h * urayt( 2 )
-          ! WRITE( PRTFile, * ) 'StepToBdry2D upper range h to', h, x2
+          IF ( STEP_DEBUGGING ) THEN
+             WRITE( PRTFile, * ) 'StepToBdry2D upper range h to', h, x2
+          END IF
           topRefl = .FALSE.
           botRefl = .FALSE.
        END IF
@@ -308,7 +324,9 @@ CONTAINS
     IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN   ! is it taking an infinitesimal step?
        h = INFINITESIMAL_STEP_SIZE * Beam%deltas            ! make sure we make some motion
        x2 = x0 + h * urayt
-       ! WRITE( PRTFile, * ) 'StepToBdry2D small step forced h to', h, x2
+       IF ( STEP_DEBUGGING ) THEN
+          WRITE( PRTFile, * ) 'StepToBdry2D small step forced h to', h, x2
+       END IF
        ! Recheck reflection conditions
        d = x2 - Topx             ! vector from top to ray
        IF ( DOT_PRODUCT( Topn, d ) > EPSILON( h ) ) THEN
