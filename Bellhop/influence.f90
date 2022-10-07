@@ -99,8 +99,7 @@ CONTAINS
              END SELECT
 
              rB  = ray2D( iS )%x( 1 ) + nB * rnV( iS ) * Polarity
-             !!! following assumes uniform space in Pos%r
-             ir2 = MAX( MIN( INT( ( rB - Pos%Rr( 1 ) ) / Pos%Delta_r ) + 1, Pos%NRr ), 1 ) ! index of receiver
+             ir2 = RToIR( rB )
 
              ! detect and skip duplicate points (happens at boundary reflection)
              IF ( ir1 >= ir2 .OR. ABS( ray2D( iS )%x( 1 ) - ray2D( iS - 1 )%x( 1 ) ) < 1.0D3 * SPACING( ray2D( iS )%x( 1 ) ) ) THEN
@@ -229,10 +228,8 @@ CONTAINS
        rB = ray2D( iS     )%x( 1 )
        IF ( ABS( rB - rA ) < 1.0D3 * SPACING( rB ) ) CYCLE Stepping   ! don't process duplicate points
 
-       ! Compute upper index on rcvr line
-       !!! Assumes r is a vector of equally spaced points
-       irA = MAX( MIN( INT( ( rA - Pos%Rr( 1 ) ) / Pos%Delta_r ) + 1, Pos%NRr ), 1 ) ! should be ", 0 )" ?
-       irB = MAX( MIN( INT( ( rB - Pos%Rr( 1 ) ) / Pos%Delta_r ) + 1, Pos%NRr ), 1 )
+       irA = RToIR( rA )
+       irB = RToIR( rB )
 
        IF ( irA >= irB ) CYCLE Stepping
 
@@ -308,8 +305,36 @@ CONTAINS
     REAL    (KIND=8) :: nA, nB, zr, L, dq( Beam%Nsteps - 1 )
     REAL    (KIND=8) :: znV( Beam%Nsteps ), rnV( Beam%Nsteps ),  RcvrDeclAngleV ( Beam%Nsteps )
     COMPLEX (KIND=8) :: dtau( Beam%Nsteps - 1 )
+    REAL    (KIND=8) :: KMAHphase( Beam%Nsteps )
 
     !!! need to add logic related to NRz_per_range
+    
+    ! LP: This code was in Stepping after the check and cycle for duplicate points:
+    !!! [mbp] this should be pre-computed
+    ! q  = ray2D( iS - 1 )%q( 1 )
+    ! CALL IncPhaseIfCaustic( .TRUE. )
+    ! qold = q
+    ! Fixed BUG: This code is likely incorrect. If irA == irB for a particular
+    ! iz, the step is skipped. Which steps meet this condition depends on
+    ! Pos%Rz, which is receiver information and has nothing to do with the
+    ! ray/beam itself. If q goes from negative to positive on one step, the
+    ! caustic will go unnoticed until the next step where irA != irB. However,
+    ! if there are TWO caustics during this time (i.e. at two or more
+    ! sequential steps where irA != irB), q will have gone from negative to
+    ! positive back to negative and the phase change will be completely missed.
+    ! This means field results at one receiver depend on where other receivers
+    ! are, which is non-physical. This is fixed in 3D in the way implied by
+    ! mbp's comment, by precomputing the phase in a way that is independent of
+    ! receiver stuff.
+    qOld = ray2D( 1 )%q( 1 )
+    phase = 0
+    KMAHphase( 1 ) = 0
+    DO is = 2, Beam%Nsteps
+       q = ray2D( is )%q( 1 )
+       CALL IncPhaseIfCaustic( .TRUE. )
+       qOld = q
+       KMAHphase( is ) = phase
+    END DO
 
     q0           = ray2D( 1 )%c / Dalpha   ! Reference for J = q0 / q
     SrcDeclAngle = RadDeg * alpha          ! take-off angle in degrees
@@ -333,9 +358,6 @@ CONTAINS
     RcvrDepths: DO iz = 1, NRz_per_range
        zR = Pos%Rz( iz )
 
-       phase = 0.0
-       qOld  = ray2D( 1 )%q( 1 )       ! used to track KMAH index
-
        IF ( ABS( znV( 1 ) ) < 1D-6 ) THEN   ! normal parallel to horizontal receiver line
           nA  = 1D10
           rA  = 1D10
@@ -343,8 +365,7 @@ CONTAINS
        ELSE
           nA  = ( zR - ray2D( 1 )%x( 2 )   ) / znV( 1 )
           rA  = ray2D( 1 )%x( 1 ) + nA * rnV( 1 )
-          !!! following assumes uniform spacing in Pos%r
-          irA = MAX( MIN( INT( ( rA - Pos%Rr( 1 ) ) / Pos%Delta_r ) + 1, Pos%NRr ), 1 ) ! index of receiver
+          irA = RToIR( rA )
        END IF
 
        Stepping: DO iS = 2, Beam%Nsteps
@@ -354,9 +375,7 @@ CONTAINS
           IF ( ABS( znV( iS ) ) < 1D-10 ) CYCLE Stepping   ! If normal parallel to TL-line, skip to next step on ray
           nB  = ( zR - ray2D( iS )%x( 2 )   ) / znV( iS )
           rB  = ray2D( iS )%x( 1 ) + nB * rnV( iS )
-
-          !!! following assumes uniform spacing in Pos%r
-          irB = MAX( MIN( INT( ( rB - Pos%Rr( 1 ) ) / Pos%Delta_r ) + 1, Pos%NRr ), 1 ) ! index of receiver
+          irB = RToIR( rB )
 
           ! detect and skip duplicate points (happens at boundary reflection)
           IF ( ABS( ray2D( iS )%x( 1 ) - ray2D( iS - 1 )%x( 1 ) ) < 1.0D3 * SPACING( ray2D( iS )%x( 1 ) ) .OR. irA == irB ) THEN
@@ -365,11 +384,6 @@ CONTAINS
              irA = irB
              CYCLE Stepping
           END IF
-
-          !!! this should be pre-computed
-          q  = ray2D( iS - 1 )%q( 1 )
-          CALL IncPhaseIfCaustic( .TRUE. )
-          qold = q
 
           RcvrDeclAngle = RcvrDeclAngleV( iS )
 
@@ -389,6 +403,9 @@ CONTAINS
                 const    = ray2D( iS )%Amp / SQRT( ABS( q ) ) 
                 W        = ( L - n ) / L   ! hat function: 1 on center, 0 on edge
                 Amp      = const * W
+                
+                phase = KMAHphase( iS - 1 )
+                qOld = ray2D( is - 1 )%q( 1 )
                 CALL FinalPhase( .FALSE. )
 
                 CALL ApplyContribution( U( iz, ir ) )
@@ -541,7 +558,7 @@ CONTAINS
     ELSE
        Ratio1 = 1 / SQRT( 2. * pi )                             ! line  source
     END IF
-
+    
     Stepping: DO iS = 2, Beam%Nsteps
 
        rB    = ray2D( iS     )%x( 1 )
@@ -857,9 +874,10 @@ CONTAINS
     
     ! phase shifts at caustics
     !!! this should be precomputed
-    ! LP: The ray point phase is discarded if the condition is met, is this correct?
-    ! LP: Gaussian reads the phase from the current point, all others (including 3D)
-    ! read the phase from the previous point, is this correct?
+    ! LP: All 2D functions discard the ray point phase if the condition is met,
+    ! probably BUG
+    ! LP: 2D Gaussian Cartesian reads the phase from the current point, all
+    ! others (including 3D) read the phase from the previous point, probably BUG
     IF ( isGaussian ) THEN
        phaseStepNum = iS
     ELSE

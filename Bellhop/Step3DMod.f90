@@ -40,9 +40,11 @@ CONTAINS
     IF ( STEP_DEBUGGING ) THEN
        WRITE( PRTFile, * )
        WRITE( PRTFile, * ) 'ray0 x t', ray0%x, ray0%t
+       WRITE( PRTFile, * ) 'ray0 p q', ray0%p_tilde, ray0%q_tilde
+       WRITE( PRTFile, * ) '        ', ray0%p_hat,   ray0%q_hat
        WRITE( PRTFile, * ) 'iSegx iSegy iSegz', iSegx, iSegy, iSegz
     END IF
-           
+    
     ! The numerical integrator used here is a version of the polygon (a.k.a. midpoint, leapfrog, or Box method), and similar
     ! to the Heun (second order Runge-Kutta method).
     ! However, it's modified to allow for a dynamic step change, while preserving the second-order accuracy).
@@ -132,14 +134,17 @@ CONTAINS
        CALL CurvatureCorrection
 
     END IF
-
+    
+    ! WRITE( PRTFile, * ) 'ray2 p q', ray2%p_tilde, ray2%q_tilde
+    ! WRITE( PRTFile, * ) '        ', ray2%p_hat,   ray2%q_hat
+    
   CONTAINS
     SUBROUTINE CurvatureCorrection
 
       ! correct p-q due to jumps in the gradient of the sound speed
 
       USE cross_products
-
+      
       Th    = DOT_PRODUCT( ray2%t, nBdry )   ! component of ray tangent, normal to boundary
       tBdry = ray2%t - Th * nBdry            ! tangent, along the boundary, in the reflection plane
       tBdry = tBdry / NORM2( tBdry )         ! unit boundary tangent
@@ -155,6 +160,8 @@ CONTAINS
       cn1jump = DOT_PRODUCT( gradcjump, rayn1 )
       cn2jump = DOT_PRODUCT( gradcjump, rayn2 )
       csjump  = DOT_PRODUCT( gradcjump, rayt  )
+      
+      WRITE( PRTFile, * ) 'cn1 cn2 cs jumps', cn1jump, cn2jump, csjump
 
       RM = Tg / Th   ! this is tan( alpha ) where alpha is the angle of incidence
       R1 = RM * ( 2 * cn1jump - RM * csjump ) / c2 ** 2

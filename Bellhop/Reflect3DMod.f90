@@ -64,6 +64,9 @@ CONTAINS
 
     CALL CalcTangent_Normals( ray3D( is  )%t, nBdry, rayt,       rayn1,       rayn2       ) ! incident
     CALL CalcTangent_Normals( ray3D( is1 )%t, nBdry, rayt_tilde, rayn1_tilde, rayn2_tilde ) ! reflected
+    
+    ! WRITE( PRTFile, * ) 'point0', rayt, rayn1, rayn2
+    ! WRITE( PRTFile, * ) 'point1', rayt_tilde, rayn1_tilde, rayn2_tilde
 
     ! rotation matrix to get surface curvature in and perpendicular to the reflection plane
     ! we use only the first two elements of the vectors because we want the projection in the x-y plane
@@ -77,11 +80,13 @@ CONTAINS
     ! DMat = RotMat^T * kappaMat * RotMat, with RotMat anti-symmetric
     DMatTemp = MATMUL( 2 * kappaMat, RotMat )
     DMat     = MATMUL( TRANSPOSE( RotMat ), DMatTemp )
+    ! WRITE( PRTFile, * ) 'DMat', DMat
 
     ! normal and tangential derivatives of the sound speed
     cn1jump =  DOT_PRODUCT( gradc, -rayn1_tilde - rayn1 )
     cn2jump =  DOT_PRODUCT( gradc, -rayn2_tilde - rayn2 )
     csjump  = -DOT_PRODUCT( gradc,  rayt_tilde  - rayt  )
+    ! WRITE( PRTFile, * ) 'cn1jump cn2jump csjump', cn1jump, cn2jump, csjump
 
 !!! not sure if cn2 needs a sign flip also
 !!$  IF ( BotTop == 'TOP' ) THEN
@@ -144,6 +149,7 @@ CONTAINS
       R1 = 2 / c ** 2 * DMat( 1, 1 ) / Th + RM * ( 2 * cn1jump - RM * csjump ) / c ** 2
       R2 = 2 / c *      DMat( 1, 2 ) * SIGN( 1.0D0, -Th )      + RM * cn2jump  / c ** 2
       R3 = 2 *          DMat( 2, 2 ) * Th
+      ! WRITE( PRTFile, * ) 'rmat', R1, R2, R2, R3
 
       ! z-component of unit tangent is sin( theta ); we want cos( theta )
       !R1 = R1 * ( 1 - ( ray%c * ray%t( 3 ) ) ** 2 )
@@ -153,29 +159,41 @@ CONTAINS
 
       CALL RayNormal( ray%t, ray%phi, ray%c, e1, e2 )  ! Compute ray normals e1 and e2
 
-      ! rotate p-q from e1, e2 system, onto rayn1, rayn2 system
+      IF ( R1 == 0.0D0 .AND. R2 == 0.0D0 .AND. R3 == 0.0D0 ) THEN
+         
+         ! LP: There is no curvature change, but rotating p forward and back
+         ! can change it slightly due to floating-point imprecision, leading to
+         ! long-term divergence.
+         rayOut%p_tilde = ray%p_tilde
+         rayOut%p_hat   = ray%p_hat
+         
+      ELSE
 
-      RotMat( 1, 1 ) = DOT_PRODUCT( rayn1, e1 )
-      RotMat( 1, 2 ) = DOT_PRODUCT( rayn1, e2 )
-      RotMat( 2, 1 ) = -RotMat( 1, 2 )             ! same as DOT_PRODUCT( rayn2, e1 )
-      RotMat( 2, 2 ) = DOT_PRODUCT( rayn2, e2 )
+         ! rotate p-q from e1, e2 system, onto rayn1, rayn2 system
 
-      p_tilde_in = RotMat( 1, 1 ) * ray%p_tilde + RotMat( 1, 2 ) * ray%p_hat
-      p_hat_in   = RotMat( 2, 1 ) * ray%p_tilde + RotMat( 2, 2 ) * ray%p_hat
+         RotMat( 1, 1 ) = DOT_PRODUCT( rayn1, e1 )
+         RotMat( 1, 2 ) = DOT_PRODUCT( rayn1, e2 )
+         RotMat( 2, 1 ) = -RotMat( 1, 2 )             ! same as DOT_PRODUCT( rayn2, e1 )
+         RotMat( 2, 2 ) = DOT_PRODUCT( rayn2, e2 )
 
-      q_tilde_in = RotMat( 1, 1 ) * ray%q_tilde + RotMat( 1, 2 ) * ray%q_hat
-      q_hat_in   = RotMat( 2, 1 ) * ray%q_tilde + RotMat( 2, 2 ) * ray%q_hat
+         p_tilde_in = RotMat( 1, 1 ) * ray%p_tilde + RotMat( 1, 2 ) * ray%p_hat
+         p_hat_in   = RotMat( 2, 1 ) * ray%p_tilde + RotMat( 2, 2 ) * ray%p_hat
 
-      ! here's the actual curvature change
+         q_tilde_in = RotMat( 1, 1 ) * ray%q_tilde + RotMat( 1, 2 ) * ray%q_hat
+         q_hat_in   = RotMat( 2, 1 ) * ray%q_tilde + RotMat( 2, 2 ) * ray%q_hat
 
-      p_tilde_out = p_tilde_in + q_tilde_in * R1 - q_hat_in * R2
-      p_hat_out   = p_hat_in   + q_tilde_in * R2 + q_hat_in * R3
-      !p_hat_out   = p_hat_in   + q_tilde_in * R2 - q_hat_in * R3 ! this one good
+         ! here's the actual curvature change
 
-      ! rotate p-q back to e1, e2 system (RotMat^(-1) = RotMat^T)
+         p_tilde_out = p_tilde_in + q_tilde_in * R1 - q_hat_in * R2
+         p_hat_out   = p_hat_in   + q_tilde_in * R2 + q_hat_in * R3
+         !p_hat_out   = p_hat_in   + q_tilde_in * R2 - q_hat_in * R3 ! this one good
 
-      rayOut%p_tilde = RotMat( 1, 1 ) * p_tilde_out + RotMat( 2, 1 ) * p_hat_out
-      rayOut%p_hat   = RotMat( 1, 2 ) * p_tilde_out + RotMat( 2, 2 ) * p_hat_out
+         ! rotate p-q back to e1, e2 system (RotMat^(-1) = RotMat^T)
+
+         rayOut%p_tilde = RotMat( 1, 1 ) * p_tilde_out + RotMat( 2, 1 ) * p_hat_out
+         rayOut%p_hat   = RotMat( 1, 2 ) * p_tilde_out + RotMat( 2, 2 ) * p_hat_out
+
+      END IF
 
       rayOut%q_tilde = ray%q_tilde
       rayOut%q_hat   = ray%q_hat
@@ -185,6 +203,7 @@ CONTAINS
 
       ! Logic below fixes a bug when the |dot product| is infinitesimally greater than 1 (then ACos is complex)
       rayOut%phi = ray%phi + 2 * ACOS( MAX( MIN( DOT_PRODUCT( rayn1, e1 ), 1.0D0 ), -1.0D0 ) ) !!!What happens to torsion?
+      ! WRITE( PRTFile, * ) 'dot phi', DOT_PRODUCT( rayn1, e1 ), rayOut%phi
       !write( *, * ) rayn1, e1
       ! write( *, * ) DOT_PRODUCT( rayn1, e1 ), ACOS( MAX( MIN( DOT_PRODUCT( rayn1, e1 ), 1.0D0 ), -1.0D0 ) )
       ! f, g, h continuation; needs curvature corrections

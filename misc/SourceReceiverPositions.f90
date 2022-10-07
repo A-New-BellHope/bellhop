@@ -25,6 +25,26 @@ MODULE SourceReceiverPositions
   TYPE ( Position ) :: Pos   ! structure containing source and receiver positions
 
 CONTAINS
+    
+  FUNCTION RToIR( r )
+      
+    ! index of nearest rcvr before normal
+    ! Compute upper index on rcvr line
+    !!! Assumes Pos%r is a vector of equally spaced points
+    
+    REAL ( KIND=8 ), INTENT( IN ) :: r
+    INTEGER                       :: RToIR, ti
+    REAL ( KIND=8 )               :: temp
+    
+    temp = ( r - Pos%Rr( 1 ) ) / Pos%Delta_r
+    ! LP: Added snapping to deal with floating-point error at the int boundaries.
+    IF ( ABS( temp - REAL( NINT( temp ), 8 ) ) < 1D-6 ) THEN
+       temp = REAL( NINT( temp ), 8 )
+    END IF
+    ! mbp: should be ", 0 )" ? [LP: on 2D Cerveny cart]
+    RToIR = MAX( MIN( INT( temp ) + 1, Pos%NRr ), 1 )
+    
+  END FUNCTION RToIR
 
   SUBROUTINE ReadfreqVec( freq0, BroadbandOption )
 
