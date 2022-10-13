@@ -323,26 +323,7 @@ CONTAINS
 
     ! Get the Top segment info (index and range interval) for XY position, x
     ! sets Topx and Topn
-    ! LP: According to the original logic, if the ray escapes the box here,
-    ! a warning is printed, and the other segment info is not updated. If
-    ! the ray escaped the box to the negative side in either dimension, or
-    ! the results are NaN below (should never happen), the ray is then
-    ! terminated in TraceRay without the current step. However, if the ray
-    ! escaped to the positive side, the ray is terminated as part of the
-    ! normal stopping conditions, including the current step.
-    ! On top of that weird asymmetry, of course the original logic allowed
-    ! for steps to the edge of the same segment they are currently in,
-    ! whereas we always step into the next segment according to the tangent.
-    ! Finally, in 2D, the altimetry / bathymetry are extended to very large
-    ! values so this never gets hit, whereas in Nx2D and 3D it is not so
-    ! almost all rays hit this case.
-    ! This has been changed to:
-    ! - An override so being at the outer edge of a segment is OK for the
-    !   last segment (just for this step)
-    ! - If the position is actually outside the segment, print a warning
-    !   and put it in the nearest valid segment.
-    ! - Changed the stopping condition to stop if on the boundary and
-    !   pointing outwards.
+    ! LP: See discussion of changes in README.md.
 
     INTEGER, PARAMETER :: PRTFile = 6
     REAL (KIND=8), INTENT( IN ) :: x( 3 ), t( 3 )

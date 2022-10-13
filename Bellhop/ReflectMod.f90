@@ -154,8 +154,13 @@ CONTAINS
              cco = co * co
              ssi = si * si
 
-             ! LP: BUG: Missing divide by 0 check on si from 2D version.
-             delta   = a * co / si / ( ck * sb * d )    
+             ! LP: Missing divide by 0 check on si from 2D version re-added.
+             IF ( si /= 0.0 ) THEN
+                delta = a * co / si / ( ck * sb * d )   ! Do we need an abs() on this???
+             ELSE
+                delta = 0.0
+             END IF
+             
              pdelta  = real( delta ) / ( ray2D( is )%c / co)
              ddelta  = -a / ( ck*sb*d ) - a*cco / ssi / (ck*sb*d) + a*cco / (ck*b*sb*d) &
                   -a*co / si / (ck*sb*d*d) * (2* HS%rho * HS%rho *si*co-2*co*si)

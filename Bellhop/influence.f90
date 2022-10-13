@@ -309,23 +309,7 @@ CONTAINS
 
     !!! need to add logic related to NRz_per_range
     
-    ! LP: This code was in Stepping after the check and cycle for duplicate points:
-    !!! [mbp] this should be pre-computed
-    ! q  = ray2D( iS - 1 )%q( 1 )
-    ! CALL IncPhaseIfCaustic( .TRUE. )
-    ! qold = q
-    ! Fixed BUG: This code is likely incorrect. If irA == irB for a particular
-    ! iz, the step is skipped. Which steps meet this condition depends on
-    ! Pos%Rz, which is receiver information and has nothing to do with the
-    ! ray/beam itself. If q goes from negative to positive on one step, the
-    ! caustic will go unnoticed until the next step where irA != irB. However,
-    ! if there are TWO caustics during this time (i.e. at two or more
-    ! sequential steps where irA != irB), q will have gone from negative to
-    ! positive back to negative and the phase change will be completely missed.
-    ! This means field results at one receiver depend on where other receivers
-    ! are, which is non-physical. This is fixed in 3D in the way implied by
-    ! mbp's comment, by precomputing the phase in a way that is independent of
-    ! receiver stuff.
+    ! LP: See discussion of this change in the readme.
     qOld = ray2D( 1 )%q( 1 )
     phase = 0
     KMAHphase( 1 ) = 0
@@ -873,7 +857,9 @@ CONTAINS
     INTEGER :: phaseStepNum
     
     ! phase shifts at caustics
-    !!! this should be precomputed
+    !!! this should be precomputed [LP: While IncPhaseIfCaustic can be
+    ! precomputed, FinalPhase cannot, as it is dependent on the interpolated `q`
+    ! value which is not known until the main run.]
     ! LP: All 2D functions discard the ray point phase if the condition is met,
     ! probably BUG
     ! LP: 2D Gaussian Cartesian reads the phase from the current point, all
