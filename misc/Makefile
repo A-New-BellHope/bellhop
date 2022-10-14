@@ -9,7 +9,7 @@ ARFLAGS = r
 RANLIB = ranlib
 
 # include norm2.o below, if your compiler is missing that intrinsic
-OBJECTS = FatalError.o beampattern.o MathConstants.o RefCoef.o SourceReceiverPositions.o  pchipMod.o AttenMod.o sspMod.o RWSHDFile.o interpolation.o MergeVectorsMod.o munk.o ReadEnvironmentMod.o SortMod.o splinec.o subtabulate.o calculateweights.o norms.o cross_products.o monotonicMod.o PolyMod.o PekRoot.o RootFinderSecantMod.o
+OBJECTS = FatalError.o beampattern.o MathConstants.o RefCoef.o SourceReceiverPositions.o  pchipMod.o AttenMod.o sspMod.o RWSHDFile.o interpolation.o MergeVectorsMod.o munk.o ReadEnvironmentMod.o SortMod.o splinec.o subtabulate.o calculateweights.o cross_products.o monotonicMod.o PolyMod.o PekRoot.o RootFinderSecantMod.o
 
 all: libmisc.a
 
@@ -91,13 +91,9 @@ MergeVectorsMod.o: MergeVectorsMod.f90
 
 munk.o: munk.f90
 
-norms.o norms.mod: norms.f90
-	$(FC) -c $(FFLAGS) $< 
-
 ReadEnvironmentMod.o readenvironmentmod.mod: ReadEnvironmentMod.f90 sspmod.mod
 
 splinec.o: splinec.f90
 
 cross_products.o cross_products.mod: cross_products.f90
 	$(FC) -c $(FFLAGS) $< 
-

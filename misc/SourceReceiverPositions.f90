@@ -10,11 +10,11 @@ MODULE SourceReceiverPositions
   INTEGER, PARAMETER          :: Number_to_Echo = 10
   INTEGER, PRIVATE            :: IAllocStat     ! used to capture status after allocation
   INTEGER, PRIVATE, PARAMETER :: ENVFile = 5, PRTFile = 6   ! unit 5 is usually (not always) the ENVFile
-  INTEGER                     :: Nfreq          ! number of frequencies
+  INTEGER                     :: Nfreq = 1      ! number of frequencies
   REAL (KIND=8), ALLOCATABLE  :: freqVec( : )   ! frequency vector for broadband runs
 
   TYPE Position
-     INTEGER              :: NSx = 1, NSy = 1, NSz, NRz, NRr, Ntheta    ! number of x, y, z, r, theta coordinates
+     INTEGER              :: NSx = 1, NSy = 1, NSz = 1, NRz = 1, NRr = 1, Ntheta = 1    ! number of x, y, z, r, theta coordinates
      REAL                 :: Delta_r, Delta_theta
      INTEGER, ALLOCATABLE :: iSz( : ), iRz( : )
      REAL,    ALLOCATABLE :: Sx( : ), Sy( : ), Sz( : )          ! Source x, y, z coordinates
@@ -55,15 +55,13 @@ CONTAINS
     CHARACTER,     INTENT( IN ) :: BroadbandOption*( 1 )
     INTEGER                     :: ifreq
 
-    Nfreq = 1
-
     ! Broadband run?
     IF ( BroadbandOption == 'B' ) THEN
        READ( ENVFile, * ) Nfreq
        WRITE( PRTFile, * ) '__________________________________________________________________________'
        WRITE( PRTFile, * )
        WRITE( PRTFile, * )
-       WRITE( PRTFile, * ) 'Number of frequencies =', Nfreq
+       WRITE( PRTFile, * ) '   Number of frequencies =', Nfreq
        IF ( Nfreq <= 0 ) CALL ERROUT( 'ReadEnvironment', 'Number of frequencies must be positive'  )
     END IF
 
@@ -72,7 +70,8 @@ CONTAINS
     IF ( IAllocStat /= 0 ) CALL ERROUT( 'ReadEnvironment', 'Too many frequencies'  )
 
     IF ( BroadbandOption == 'B' ) THEN
-       WRITE( PRTFile, * ) 'Frequencies (Hz)'
+       WRITE( PRTFile, * ) '   Frequencies (Hz)'
+       freqVec( 2 ) = -999.9
        freqVec( 3 ) = -999.9
        READ(  ENVFile, * ) freqVec( 1 : Nfreq )
        CALL SubTab( freqVec, Nfreq )
@@ -96,8 +95,8 @@ CONTAINS
     LOGICAL, INTENT( IN ) :: ThreeD   ! flag indicating whether this is a 3D run
 
     IF ( ThreeD ) THEN
-       CALL ReadVector( Pos%NSx, Pos%Sx, 'source   x-coordinates, Sx', 'km' )
-       CALL ReadVector( Pos%NSy, Pos%Sy, 'source   y-coordinates, Sy', 'km' )
+       CALL ReadVector( Pos%NSx, Pos%Sx, 'Source   x-coordinates, Sx', 'km' )
+       CALL ReadVector( Pos%NSy, Pos%Sy, 'Source   y-coordinates, Sy', 'km' )
     ELSE
        ALLOCATE( Pos%Sx( 1 ), Pos%Sy( 1 ) )
        Pos%Sx( 1 ) = 0.
@@ -117,8 +116,8 @@ CONTAINS
     REAL,    INTENT( IN ) :: zMin, zMax
     !LOGICAL               :: monotonic
 
-    CALL ReadVector( Pos%NSz, Pos%Sz, 'Source   depths, Sz', 'm' )
-    CALL ReadVector( Pos%NRz, Pos%Rz, 'Receiver depths, Rz', 'm' )
+    CALL ReadVector( Pos%NSz, Pos%Sz, 'Source   z-coordinates, Sz', 'm' )
+    CALL ReadVector( Pos%NRz, Pos%Rz, 'Receiver z-coordinates, Rz', 'm' )
 
     IF ( ALLOCATED( Pos%ws ) ) DEALLOCATE( Pos%ws, Pos%iSz )
     ALLOCATE( Pos%ws( Pos%NSz ), Pos%iSz( Pos%NSz ), Stat = IAllocStat )
@@ -132,7 +131,7 @@ CONTAINS
 
     IF ( ANY( Pos%Sz( 1 : Pos%NSz ) < zMin ) ) THEN
        WHERE ( Pos%Sz < zMin ) Pos%Sz = zMin
-          WRITE( PRTFile, * ) 'Warning in ReadSzRz : Source above or too near the top bdry has been moved down'
+       WRITE( PRTFile, * ) 'Warning in ReadSzRz : Source above or too near the top bdry has been moved down'
     END IF
 
     IF ( ANY( Pos%Sz( 1 : Pos%NSz ) > zMax ) ) THEN
@@ -165,7 +164,7 @@ CONTAINS
 
   SUBROUTINE ReadRcvrRanges
 
-    CALL ReadVector( Pos%NRr, Pos%Rr, 'Receiver ranges, Rr', 'km' )
+    CALL ReadVector( Pos%NRr, Pos%Rr, 'Receiver r-coordinates, Rr', 'km' )
 
     ! calculate range spacing
     Pos%delta_r = 0.0
@@ -182,7 +181,7 @@ CONTAINS
 
   SUBROUTINE ReadRcvrBearings
 
-    CALL ReadVector( Pos%Ntheta, Pos%theta, 'receiver bearings, theta', 'degrees' )
+    CALL ReadVector( Pos%Ntheta, Pos%theta, 'Receiver bearings, theta', 'degrees' )
 
     ! full 360-degree sweep? remove duplicate angle
     IF ( Pos%Ntheta > 1 ) THEN
@@ -219,7 +218,7 @@ CONTAINS
     WRITE( PRTFile, * )
 
     READ(  ENVFile, * ) Nx
-    WRITE( PRTFile, * ) 'Number of ' // Description // ' = ', Nx
+    WRITE( PRTFile, * ) '   Number of ' // Description // ' = ', Nx
 
     IF ( Nx <= 0 ) CALL ERROUT( 'ReadVector', 'Number of ' // Description // 'must be positive'  )
 
@@ -227,15 +226,15 @@ CONTAINS
     ALLOCATE( x( MAX( 3, Nx ) ), Stat = IAllocStat )
     IF ( IAllocStat /= 0 ) CALL ERROUT( 'ReadVector', 'Too many ' // Description )
 
-    WRITE( PRTFile, * ) Description // ' (' // Units // ')'
+    WRITE( PRTFile, * ) '   ', Description // ' (' // Units // ')'
     x( 3 ) = -999.9
     READ( ENVFile, * ) x( 1 : Nx )
 
     CALL SubTab( x, Nx )
     CALL Sort(   x, Nx )
 
-    WRITE( PRTFile, "( 5G14.6 )" ) ( x( ix ), ix = 1, MIN( Nx, Number_to_Echo ) )
-    IF ( Nx > Number_to_Echo ) WRITE( PRTFile,  "( G14.6 )" ) ' ... ', x( Nx )
+    WRITE( PRTFile, "( 5G14.6 )" ) '   ', ( x( ix ), ix = 1, MIN( Nx, Number_to_Echo ) )
+    IF ( Nx > Number_to_Echo ) WRITE( PRTFile, "( G14.6 )" ) ' ... ', x( Nx )
 
     WRITE( PRTFile, * )
 

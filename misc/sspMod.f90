@@ -306,7 +306,14 @@ CONTAINS
     INTEGER, INTENT( IN    ) :: Medium
     INTEGER, INTENT( INOUT ) :: N1
     INTEGER                  :: iSSP
-
+    WRITE( PRTFile, * )
+    
+    IF ( Medium == 1 ) THEN
+       WRITE( PRTFile, * ) 'Sound speed profile:'
+       WRITE( PRTFile, "( '      z         alphaR      betaR     rho        alphaI     betaI'    )" )
+       WRITE( PRTFile, "( '     (m)         (m/s)      (m/s)   (g/cm^3)      (m/s)     (m/s)', / )" )
+    END IF
+    
     SSP%NPts( Medium ) = N1
 
     ! The variable SSP%Loc( Medium ) points to the starting point for the

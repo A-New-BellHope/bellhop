@@ -37,7 +37,7 @@ CONTAINS
 
     IF ( IOSTAT /= 0 ) THEN   ! successful open?
        WRITE( PRTFile, * ) 'ENVFile = ', TRIM( FileRoot ) // '.env'
-       CALL ERROUT( 'READIN', 'Unable to open the environmental file' )
+       CALL ERROUT( 'ReadEnvironment', 'Unable to open the environmental file' )
     END IF
 
     ! set default values for the ssp (in case this is the nth profile after one has already been read)
@@ -62,12 +62,15 @@ CONTAINS
 
     IF ( SSP%NMedia > MaxMedium ) THEN
        WRITE( PRTFile, * ) 'MaxMedia = ', MaxMedium
-       CALL ERROUT( 'READIN', 'Too many Media' )
+       CALL ERROUT( 'ReadEnvironment', 'Too many Media' )
     ENDIF
 
     CALL ReadTopOpt( TopOpt, HSTop%BC, AttenUnit )
 
-    WRITE( PRTFile, "( //, '   z (m)     alphaR (m/s)   betaR  rho (g/cm^3)  alphaI     betaI', / )" )
+    IF ( HSTop%BC == 'A' ) THEN
+       WRITE( PRTFile, "( //, '      z         alphaR      betaR     rho        alphaI     betaI'    )" )
+       WRITE( PRTFile, "(     '     (m)         (m/s)      (m/s)   (g/cm^3)      (m/s)     (m/s)', / )" )
+    END IF
     CALL TopBot( HSTop )   ! read top BC
 
     !  *** Internal media *** 
@@ -76,12 +79,13 @@ CONTAINS
        IF ( AttenUnit( 1 : 1 ) == 'm' ) THEN   ! this particular attenuation unit needs to get a power law and transition frequency
           READ(  ENVFile, *, END = 9999 ) NG( Medium ), SSP%sigma( Medium ), &
                SSP%Depth( Medium + 1 ), SSP%beta( Medium ), SSP%fT( Medium )
-          WRITE( PRTFile, "( /, '  ( # mesh pts = ', I5, '  RMS roughness = ', G10.3, ' beta = ', G10.3, ' fT = ', G11.4, ' )')" ) &
+          WRITE( PRTFile, &
+               "( /, '  ( # mesh pts = ', I5, '  RMS roughness = ', G10.3, ' beta = ', G10.3, ' fT = ', G11.4, ' )')" ) &
                NG( Medium ), SSP%sigma( Medium ), SSP%beta( Medium ), SSP%fT( Medium )
 
        ELSE
           READ(  ENVFile, *, END = 9999 ) NG( Medium ), SSP%sigma( Medium ), SSP%Depth( Medium + 1 )
-          WRITE( PRTFile, "( /, '       ( # mesh points = ', I5, '  RMS roughness = ', G10.3, ' m', ' )')" ) &
+          WRITE( PRTFile, "( /, '       ( # mesh points = ', I5, '  RMS roughness = ', G10.3, ' m )')" ) &
                NG( Medium ), SSP%sigma( Medium )
        END IF
 
@@ -101,9 +105,9 @@ CONTAINS
 
        IF ( NG( Medium ) == 0 ) THEN    ! automatic calculation of f.d. mesh
           NG( Medium ) = Nneeded
-          WRITE( PRTFile, * ) '       ( Number mesh points auto calc. = ', NG( Medium ), ' )'
+          WRITE( PRTFile, "( '       ( # mesh points = ', I5, '  automatically calculated     )')" ) NG( Medium )
        ELSE IF ( NG( Medium ) < Nneeded / 2 ) THEN
-          WRITE( PRTFILE, * ) 'Number of mesh points needed = ', Nneeded
+          WRITE( PRTFILE, * ) '# mesh points needed = ', Nneeded
           CALL ERROUT( 'ReadEnvironment', 'Mesh is too coarse' )
        END IF
 
@@ -127,12 +131,12 @@ CONTAINS
     ! Read phase speed limits
     READ(  ENVFile, *    ) cLow, cHigh                 ! Spectral limits (m/s)
     WRITE( PRTFile, "( /, ' cLow = ', G12.5, ' m/s      cHigh = ', G12.5, ' m/s' )" ) cLow, cHigh
-    IF ( cLow >= cHigh ) CALL ERROUT( 'GetPar', 'Need phase speeds cLow < cHigh'  )
+    IF ( cLow >= cHigh ) CALL ERROUT( 'ReadEnvironment', 'Need phase speeds cLow < cHigh'  )
 
     ! Read maximum range
     READ(  ENVFile, * ) RMax          ! Maximum range for calculations (km)
     WRITE( PRTFile, "( ' RMax = ', G12.5, ' km' )" ) RMax
-    IF ( RMax < 0.0 ) CALL ERROUT( ' ', 'RMax must be non-negative'  )
+    IF ( RMax < 0.0 ) CALL ERROUT( 'ReadEnvironment', 'RMax must be non-negative'  )
 
     RETURN
 

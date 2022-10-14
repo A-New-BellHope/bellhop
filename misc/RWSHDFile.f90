@@ -17,7 +17,7 @@ MODULE RWSHDFile
   ! Rr      vector of receiver ranges, Rr(    1 : NRr    )
 
 CONTAINS
-  SUBROUTINE ReadHeader( FileName, Title, Atten, PlotType )
+  SUBROUTINE ReadHeader( FileName, Title, atten, PlotType )
 
     ! Read header from disk file
     ! This is not used anywhere in the Fortran code for the Acoustics Toolbox, since Matlab is used to process SHDFiles
@@ -26,7 +26,7 @@ CONTAINS
     ! Title   arbitrary title
 
     INTEGER, PARAMETER                :: PRTFile = 6
-    REAL,               INTENT( OUT ) :: Atten           ! stabilizing attenuation for SCOOTER FFP runs
+    REAL,               INTENT( OUT ) :: atten           ! stabilizing attenuation for SCOOTER FFP runs
     CHARACTER (LEN=80), INTENT( OUT ) :: Title, FileName
     CHARACTER (LEN=10), INTENT( OUT ) :: PlotType
     INTEGER                           :: IAllocStat, IOStat
@@ -64,11 +64,11 @@ CONTAINS
 
   !**********************************************************************!
 
-  SUBROUTINE WriteHeader( FileName, Title, freq0, Atten, PlotType )
+  SUBROUTINE WriteHeader( FileName, Title, freq0, atten, PlotType )
 
     ! Write header to disk file
 
-    REAL,      INTENT( IN ) :: freq0, Atten      ! Nominal frequency, stabilizing attenuation (for wavenumber integration only)
+    REAL,      INTENT( IN ) :: freq0, atten      ! Nominal frequency, stabilizing attenuation (for wavenumber integration only)
     CHARACTER, INTENT( IN ) :: FileName*( * )    ! Name of the file (could be a shade file or a Green's function file)
     CHARACTER, INTENT( IN ) :: Title*( * )       ! Arbitrary title
     CHARACTER, INTENT( IN ) :: PlotType*( 10 )   ! If 'TL', writes only first and last Sx and Sy
@@ -77,21 +77,18 @@ CONTAINS
     IF ( .NOT. ALLOCATED( Pos%theta ) ) THEN
        ALLOCATE( Pos%theta( 1 ) )
        Pos%theta( 1 ) = 0   ! dummy bearing angle
-       Pos%Ntheta     = 1
     END IF
 
     ! source x-coordinates
     IF ( .NOT. ALLOCATED( Pos%Sx ) ) THEN
        ALLOCATE( Pos%Sx( 1 ) )
        Pos%sx( 1 ) = 0      ! dummy x-coordinate
-       Pos%NSx     = 1
     END IF
 
     ! source y-coordinates
     IF ( .NOT. ALLOCATED( Pos%Sy ) ) THEN
        ALLOCATE( Pos%Sy( 1 ) )
        Pos%sy( 1 ) = 0      ! dummy y-coordinate
-       Pos%NSy     = 1
     END IF
 
     IF ( PlotType( 1 : 2 ) /= 'TL' ) THEN

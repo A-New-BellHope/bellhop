@@ -1,8 +1,8 @@
 MODULE SubTabulate
 
-  ! If x(3) = -999.9 then subtabulation is performed
-  ! i.e., a vector is generated with Nx points in [ x(1), x(2) ]
-  ! If x(2) = -999.9 then x(1) is repeated into x(2)
+  ! If x( 3 ) = -999.9 then subtabulation is performed
+  ! i.e., a vector is generated with Nx points in [ x( 1 ), x( 2 ) ]
+  ! If x( 2 ) = -999.9 then x( 1 ) is repeated into x( 2 )
 
   ! mbp 1/2015
 
