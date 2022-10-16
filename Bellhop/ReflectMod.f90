@@ -4,7 +4,7 @@ MODULE ReflectMod
   IMPLICIT NONE
 CONTAINS
 
-  SUBROUTINE Reflect2D( is, HS, BotTop, nBdry3d, z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy, RefC, Npts, xs, tradial )
+  SUBROUTINE Reflect2D( is, HS, BotTop, nBdry3d, z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy, RefC, Npts, tradial )
 
     !USE norms
     USE RefCoef
@@ -12,7 +12,7 @@ CONTAINS
     USE Cone   ! if using analytic formulas for the cone (conical seamount)
 
     INTEGER,              INTENT( IN ) :: Npts
-    REAL     (KIND=8),    INTENT( IN ) :: xs( 3 ), tradial( 2 )
+    REAL     (KIND=8),    INTENT( IN ) :: tradial( 2 )
     REAL     (KIND=8),    INTENT( IN ) :: nBdry3d( 3 )                    ! Normal to the boundary
     CHARACTER (LEN=3),    INTENT( IN ) :: BotTop                          ! Flag indicating bottom or top reflection
     TYPE( HSInfo ),       INTENT( IN ) :: HS                              ! half-space properties
@@ -37,7 +37,7 @@ CONTAINS
     nBdry( 1 ) = DOT_PRODUCT( nBdry3d( 1 : 2 ), tradial )
     nBdry( 2 ) = nBdry3d( 3 )
 
-    !CALL ConeFormulas( z_xx, z_xy, z_yy, nBdry, xs, tradial, ray2D( is )%x, BotTop )   ! special case of a conical seamount
+    !CALL ConeFormulas( z_xx, z_xy, z_yy, nBdry, xs_3D, tradial, ray2D( is )%x, BotTop )   ! special case of a conical seamount
 
     !!!! use kappa_xx or z_xx?
     ! kappa = ( z_xx * tradial( 1 ) ** 2 + 2 * z_xy * tradial( 1 ) * tradial( 2 ) + z_yy * tradial( 2 ) ** 2 )
@@ -63,7 +63,7 @@ CONTAINS
     ! Calculate the change in curvature
     ! Based on formulas given by Muller, Geoph. J. R.A.S., 79 (1984).
 
-    CALL EvaluateSSP2D( ray2D( is1 )%x, ray2D( is1 )%t, c, cimag, gradc, crr, crz, czz, rho, xs, tradial, freq )
+    CALL EvaluateSSP2D( ray2D( is1 )%x, ray2D( is1 )%t, c, cimag, gradc, crr, crz, czz, rho, xs_3D, tradial, freq )
 
     ! incident and reflected (tilde) unit ray tangent and normal
     rayt       = c * ray2D( is  )%t                       ! unit tangent to ray
@@ -121,6 +121,7 @@ CONTAINS
 
        Refl = ( HS%rho * gamma1 - rho * gamma2 ) / ( HS%rho * gamma1 + rho * gamma2 )
 
+       ! write( *, * ) abs( Refl ), c, HS%cp, rho, HS%rho
        IF ( ABS( Refl ) < 1.0E-5 ) THEN   ! kill a ray that has lost its energy in reflection
           ray2D( is1 )%Amp   = 0.0
           ray2D( is1 )%Phase = ray2D( is )%Phase

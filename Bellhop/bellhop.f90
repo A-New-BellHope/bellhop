@@ -19,7 +19,6 @@ PROGRAM BELLHOP
 
   ! First version (1983) originally developed with Homer Bucker, Naval Ocean Systems Center
   
-  USE MathConstants
   USE ReadEnvironmentBell
   USE BeamPattern
   USE bdryMod
@@ -32,10 +31,12 @@ PROGRAM BELLHOP
 
   IMPLICIT NONE
   
-  LOGICAL, PARAMETER   :: ThreeD = .FALSE., Inline = .FALSE.
+  LOGICAL, PARAMETER   :: Inline = .FALSE.
   INTEGER              :: jj
   CHARACTER ( LEN=2  ) :: AttenUnit
   CHARACTER ( LEN=80 ) :: FileRoot
+
+  ThreeD = .FALSE.
 
   ! get the file root for naming all input and output files
   ! should add some checks here ...
@@ -84,7 +85,7 @@ PROGRAM BELLHOP
 
      Pos%Sz( 1 ) = 50.
      !Pos%Rz     = [ 0, 50, 100 ]
-     !Pos%r      = 1000. * [ 1, 2, 3, 4, 5 ]   ! meters !!!
+     !Pos%Rr     = 1000. * [ 1, 2, 3, 4, 5 ]   ! meters !!!
      Pos%Rz      = [ ( jj, jj = 1, Pos%NRz ) ]
      Pos%Rr      = 10. * [ ( jj, jj = 1 , Pos%NRr ) ]   ! meters !!!
 
@@ -286,7 +287,7 @@ SUBROUTINE BellhopCore
            ! show progress ...
            IF ( MOD( ialpha - 1, max( Angles%Nalpha / 50, 1 ) ) == 0 ) THEN
               WRITE( PRTFile, FMT = "( 'Tracing beam ', I7, F10.2 )" ) ialpha, SrcDeclAngle
-              CALL FLUSH( PRTFile )
+              FLUSH( PRTFile )
            END IF
 
            CALL TraceRay2D( xs, Angles%alpha( ialpha ), Amp0 )   ! Trace a ray
@@ -339,20 +340,23 @@ SUBROUTINE BellhopCore
      END SELECT
 
   END DO SourceDepth
-
+  
+  ! Display run time
+  CALL CPU_TIME( Tstop )
+  WRITE( PRTFile, "( /, ' CPU Time = ', G15.3, 's' )" ) Tstop - Tstart
+  
   ! close all files
   SELECT CASE ( Beam%RunType( 1 : 1 ) )
   CASE ( 'C', 'S', 'I' )      ! TL calculation
      CLOSE( SHDFile )
   CASE ( 'A', 'a' )           ! arrivals calculation
      CLOSE( ARRFile )
-  CASE ( 'R' )                ! ray trace
+  CASE ( 'R', 'E' )                ! ray trace
      CLOSE( RAYFile )
   END SELECT
 
-  ! Display run time
-  CALL CPU_TIME( Tstop )
-  WRITE( PRTFile, "( /, ' CPU Time = ', G15.3, 's' )" ) Tstop - Tstart
+  CLOSE( PRTFile )
+  
 END SUBROUTINE BellhopCore
 
 ! **********************************************************************!
@@ -378,13 +382,13 @@ COMPLEX (KIND=8 ) FUNCTION PickEpsilon( BeamType, omega, c, gradc, alpha, Dalpha
      TAG    = 'Paraxial beams'
      SELECT CASE ( BeamType( 2 : 2 ) )
      CASE ( 'F' )
-        TAG       = 'Space filling beams'
-        halfwidth = 2.0 / ( ( omega / c ) * Dalpha )
-        epsilonOpt    = i * 0.5 * omega * halfwidth ** 2
+        TAG        = 'Space filling beams'
+        halfwidth  = 2.0 / ( ( omega / c ) * Dalpha )
+        epsilonOpt = i * 0.5 * omega * halfwidth ** 2
      CASE ( 'M' )
-        TAG       = 'Minimum width beams'
-        halfwidth = SQRT( 2.0 * c * 1000.0 * rLoop / omega )
-        epsilonOpt    = i * 0.5 * omega * halfwidth ** 2
+        TAG        = 'Minimum width beams'
+        halfwidth  = SQRT( 2.0 * c * 1000.0 * rLoop / omega )
+        epsilonOpt = i * 0.5 * omega * halfwidth ** 2
      CASE ( 'W' )
         TAG       = 'WKB beams'
         halfwidth = HUGE( halfwidth )
@@ -407,7 +411,7 @@ COMPLEX (KIND=8 ) FUNCTION PickEpsilon( BeamType, omega, c, gradc, alpha, Dalpha
      epsilonOpt = i * 0.5 * omega * halfwidth ** 2
 
   CASE ( 'b' )
-     CALL ERROUT( 'BELLHOP', 'Geo Gaussian beams in ray-cent. coords. not implemented in BELLHOP' )
+     CALL ERROUT( 'BELLHOP', 'Geo Gaussian beams in ray-centered coords. not implemented in BELLHOP' )
 
   CASE ( 'S' )
      TAG        = 'Simple Gaussian beams'
@@ -493,7 +497,7 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
      Bdry%Bot%HS%rho = Bot( IsegBot )%HS%rho
   END IF
 
-  ! Trace the beam (note that Reflect alters the step index is)
+  ! Trace the beam (note that Reflect alters the step index, is)
   is = 0
   CALL Distances2D( ray2D( 1 )%x, Top( IsegTop )%x, Bot( IsegBot )%x, dEndTop,    dEndBot,  &
        Top( IsegTop )%n, Bot( IsegBot )%n, DistBegTop, DistBegBot )
@@ -584,6 +588,8 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
      END IF
 
      ! Has the ray left the box, lost its energy, escaped the boundaries, or exceeded storage limit?
+     ! There is a test here for when two adjacent ray points are outside the boundaries
+     ! BELLHOP3D handles this differently using a counter-limit for really small steps.
      IF ( ABS( ray2D( is + 1 )%x( 1 ) ) > Beam%Box%r .OR. &
           ABS( ray2D( is + 1 )%x( 2 ) ) > Beam%Box%z .OR. ray2D( is + 1 )%Amp < 0.005 .OR. &
           ( DistBegTop < 0.0 .AND. DistEndTop < 0.0 ) .OR. &
@@ -635,11 +641,11 @@ SUBROUTINE Reflect2D( is, HS, BotTop, tBdry, nBdry, kappa, RefC, Npts )
   TYPE(ReflectionCoef), INTENT( IN ) :: RefC( NPts )            ! reflection coefficient
   INTEGER,              INTENT( INOUT ) :: is
   INTEGER           :: is1
-  REAL     (KIND=8) :: c, cimag, gradc( 2 ), crr, crz, czz, rho       ! derivatives of sound speed
+  REAL     (KIND=8) :: c, cimag, gradc( 2 ), crr, crz, czz, rho                  ! derivatives of sound speed
   REAL     (KIND=8) :: RM, RN, Tg, Th, rayt( 2 ), rayn( 2 ), rayt_tilde( 2 ), rayn_tilde( 2 ), cnjump, csjump  ! for curvature change
   REAL     (KIND=8) :: ck, co, si, cco, ssi, pdelta, rddelta, sddelta, theta_bot ! for beam shift
-  COMPLEX  (KIND=8) :: kx, kz, kzP, kzS, kzP2, kzS2, mu, f, g, y2, y4, Refl   ! for tabulated reflection coef.
-  COMPLEX  (KIND=8) :: ch, a, b, d, sb, delta, ddelta                 ! for beam shift
+  COMPLEX  (KIND=8) :: kx, kz, kzP, kzS, kzP2, kzS2, mu, f, g, y2, y4, Refl      ! for tabulated reflection coef.
+  COMPLEX  (KIND=8) :: ch, a, b, d, sb, delta, ddelta                            ! for beam shift
   TYPE(ReflectionCoef) :: RInt
 
   is  = is + 1
@@ -785,9 +791,9 @@ SUBROUTINE Reflect2D( is, HS, BotTop, tBdry, nBdry, kappa, RefC, Npts )
            ! that tracks crossing into new segments after the ray displacement.
            
            theta_bot = datan( tBdry( 2 ) / tBdry( 1 ))  ! bottom angle
-           ray2D( is1 )%x( 1 ) = ray2D( is1 )%x( 1 ) + real( delta ) * dcos( theta_bot )   ! range displacement
-           ray2D( is1 )%x( 2 ) = ray2D( is1 )%x( 2 ) + real( delta ) * dsin( theta_bot )   ! depth displacement
-           ray2D( is1 )%tau    = ray2D( is1 )%tau + pdelta             ! phase change
+           ray2D( is1 )%x( 1 ) = ray2D( is1 )%x( 1 ) + real( delta ) * dcos( theta_bot )       ! range displacement
+           ray2D( is1 )%x( 2 ) = ray2D( is1 )%x( 2 ) + real( delta ) * dsin( theta_bot )       ! depth displacement
+           ray2D( is1 )%tau    = ray2D( is1 )%tau + pdelta                                     ! phase change
            ray2D( is1 )%q      = ray2D( is1 )%q + sddelta * rddelta * si * c * ray2D( is )%p   ! beam-width change
         endif
 

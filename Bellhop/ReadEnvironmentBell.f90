@@ -61,7 +61,10 @@ CONTAINS
 
     ! *** Top BC ***
 
-    IF ( Bdry%Top%HS%BC == 'A' ) WRITE( PRTFile, "( //, '   z (m)     alphaR (m/s)   betaR  rho (g/cm^3)  alphaI     betaI', / )" )
+    IF ( Bdry%Top%HS%BC == 'A' ) THEN
+       WRITE( PRTFile, "( //, '      z         alphaR      betaR     rho        alphaI     betaI', / )" )
+       WRITE( PRTFile, "(     '     (m)         (m/s)      (m/s)   (g/cm^3)      (m/s)     (m/s)', / )" )
+    END IF
 
     CALL TopBot( freq, AttenUnit, Bdry%Top%HS )
 
@@ -140,6 +143,9 @@ CONTAINS
        WRITE( PRTFile, fmt = '(  '' Maximum ray x-range, Box%x = '', G11.4, '' m'' )' ) Beam%Box%x
        WRITE( PRTFile, fmt = '(  '' Maximum ray y-range, Box%y = '', G11.4, '' m'' )' ) Beam%Box%y
        WRITE( PRTFile, fmt = '(  '' Maximum ray z-range, Box%z = '', G11.4, '' m'' )' ) Beam%Box%z
+       
+       ! LP: Beam%Box%r will be used in Nx2D.
+       Beam%Box%r = SQRT( Beam%Box%x ** 2 + Beam%Box%y ** 2 )
     ELSE
        READ(  ENVFile, * ) Beam%deltas, Beam%Box%z, Beam%Box%r
 

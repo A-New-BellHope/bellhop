@@ -120,6 +120,7 @@ CONTAINS
        gamma2   = SQRT( -gamma2Sq )
 
        Refl = ( HS%rho * gamma1 - gamma2 ) / ( HS%rho * gamma1 + gamma2 )
+       !write( *, * ) abs( Refl ), c, HS%cp, rho, HS%rho
        ! Hack to make a wall (where the bottom slope is more than 80 degrees) be a perfect reflector
        !!!!!!!!!!!
        IF ( ABS( RadDeg * ATAN2( nBdry( 3 ), NORM2( nBdry( 1 : 2 ) ) ) ) < 0 ) THEN   ! was 60 degrees

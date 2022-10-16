@@ -146,7 +146,8 @@ CONTAINS
     REAL (KIND=8), INTENT( IN    ) :: x0( 2 ), urayt( 2 )                        ! ray coordinate and tangent
     REAL (KIND=8), INTENT( IN    ) :: Topx( 2 ), Topn( 2 ), Botx( 2 ), Botn( 2 ) ! Top, bottom coordinate and normal
     REAL (KIND=8), INTENT( INOUT ) :: h                                          ! reduced step size 
-    REAL (KIND=8)                  :: x( 2 ), d( 2 ), d0( 2 ), h1, h2, h3, h4, rSeg( 2 )
+    REAL (KIND=8)                  :: hInt, hBoxr, hBoxz, hTop, hBot, hSeg       ! step sizes
+    REAL (KIND=8)                  :: x( 2 ), d( 2 ), d0( 2 ), rSeg( 2 )
 
     ! Detect interface or boundary crossing and reduce step, if necessary, to land on that crossing.
     ! Keep in mind possibility that user put source right on an interface
@@ -155,32 +156,42 @@ CONTAINS
     x = x0 + h * urayt ! make a trial step
 
     ! interface crossing in depth
-    h1 = huge( h1 )
-    IF ( ABS( urayt( 2 ) ) > EPSILON( h1 ) ) THEN
-       IF      ( SSP%z( iSegz0     ) > x(  2 ) ) THEN
-          h1 = ( SSP%z( iSegz0     ) - x0( 2 ) ) / urayt( 2 )
-       ELSE IF ( SSP%z( iSegz0 + 1 ) < x(  2 ) ) THEN
-          h1 = ( SSP%z( iSegz0 + 1 ) - x0( 2 ) ) / urayt( 2 )
+    hInt = huge( hInt )
+    IF ( ABS( urayt( 2 ) ) > EPSILON( hInt ) ) THEN
+       IF        ( SSP%z( iSegz0     ) > x(  2 ) ) THEN
+          hInt = ( SSP%z( iSegz0     ) - x0( 2 ) ) / urayt( 2 )
+       ELSE IF   ( SSP%z( iSegz0 + 1 ) < x(  2 ) ) THEN
+          hInt = ( SSP%z( iSegz0 + 1 ) - x0( 2 ) ) / urayt( 2 )
        END IF
+    END IF
+    
+    ! ray mask using a box centered at ( 0, 0 )
+    hBoxr    = huge( hBoxr )
+    IF ( ABS( x( 1 ) ) > Beam%Box%r ) THEN
+       hBoxr = ( Beam%Box%r - ABS( x0( 1 ) ) ) / ABS( urayt( 1 ) )
+    END IF
+    
+    hBoxz    = huge( hBoxz )
+    IF ( ABS( x( 2 ) ) > Beam%Box%z ) THEN
+       hBoxz = ( Beam%Box%z - ABS( x0( 2 ) ) ) / ABS( urayt( 2 ) )
     END IF
 
     ! top crossing
-    h2 = huge( h2 )
-    d  = x - Topx              ! vector from top to ray
-    ! LP: Changed from EPSILON( h2 ) to 0 in conjunction with StepToBdry2D change here.
+    hTop = huge( hTop )
+    d  = x - Topx               ! vector from top to ray
+    ! LP: Changed from EPSILON( hTop ) to 0 in conjunction with StepToBdry2D change here.
     IF ( DOT_PRODUCT( Topn, d ) >= 0.0D0 ) THEN
-       d0  = x0 - Topx         ! vector from top    node to ray origin
-       h2 = -DOT_PRODUCT( d0, Topn ) / DOT_PRODUCT( urayt, Topn )
+       d0   = x0 - Topx         ! vector from top    node to ray origin
+       hTop = -DOT_PRODUCT( d0, Topn ) / DOT_PRODUCT( urayt, Topn )
     END IF
 
     ! bottom crossing
-    h3 = huge( h3 )
-    d  = x - Botx              ! vector from bottom to ray
-    ! LP: Changed from EPSILON( h2 ) (should have been h3!) to 0 in conjunction 
-    ! with StepToBdry2D change here.
+    hBot = huge( hBot )
+    d  = x - Botx               ! vector from bottom to ray
+    ! LP: Changed from EPSILON( hBot ) to 0 in conjunction with StepToBdry2D change here.
     IF ( DOT_PRODUCT( Botn, d ) >= 0.0D0 ) THEN
-       d0  = x0 - Botx         ! vector from bottom node to ray origin
-       h3 = -DOT_PRODUCT( d0, Botn ) / DOT_PRODUCT( urayt, Botn )
+       d0   = x0 - Botx         ! vector from bottom node to ray origin
+       hBot = -DOT_PRODUCT( d0, Botn ) / DOT_PRODUCT( urayt, Botn )
     END IF
 
     ! top or bottom segment crossing in range
@@ -192,21 +203,21 @@ CONTAINS
        rSeg( 2 ) = MIN( rSeg( 2 ), SSP%Seg%r( iSegr0 + 1 ) )
     END IF
 
-    h4 = huge( h4 )
+    hSeg = huge( hSeg )
     IF ( ABS( urayt( 1 ) )  > EPSILON( h4 ) ) THEN
-       IF       ( x(  1 ) < rSeg( 1 ) ) THEN
-          h4 = -( x0( 1 ) - rSeg( 1 ) ) / urayt( 1 )
-       ELSE IF  ( x(  1 ) > rSeg( 2 ) ) THEN
-          h4 = -( x0( 1 ) - rSeg( 2 ) ) / urayt( 1 )
+       IF         ( x(  1 ) < rSeg( 1 ) ) THEN
+          hSeg = -( x0( 1 ) - rSeg( 1 ) ) / urayt( 1 )
+       ELSE IF    ( x(  1 ) > rSeg( 2 ) ) THEN
+          hSeg = -( x0( 1 ) - rSeg( 2 ) ) / urayt( 1 )
        END IF
     END IF
-
-    h = MIN( h, h1, h2, h3, h4 )           ! take limit set by shortest distance to a crossing
+    
+    h = MIN( h, hInt, hBoxr, hBoxz, hTop, hBot, hSeg )      ! take limit set by shortest distance to a crossing
     IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN   ! is it taking an infinitesimal step?
        h = INFINITESIMAL_STEP_SIZE * Beam%deltas            ! make sure we make some motion
        iSmallStepCtr = iSmallStepCtr + 1   ! keep a count of the number of sequential small steps
     ELSE
-       iSmallStepCtr = 0   ! didn't do a small step so reset the counter
+       iSmallStepCtr = 0                   ! didn't do a small step so reset the counter
     END IF
 
   END SUBROUTINE ReduceStep2D
@@ -244,6 +255,18 @@ CONTAINS
              WRITE( PRTFile, * ) 'StepToBdry2D upper depth h to', h, x2
           END IF
        END IF
+    END IF
+    
+    ! ray mask using a box centered at ( 0, 0 )
+    IF ( ABS( x( 1 ) ) > Beam%Box%r ) THEN
+       h = ( Beam%Box%r - ABS( x0( 1 ) ) ) / ABS( urayt( 1 ) )
+       x2( 2 ) = x0( 2 ) + h * urayt( 2 )
+       x2( 1 ) = SIGN( Beam%Box%r, x0( 1 ) )
+    END IF
+    IF ( ABS( x( 2 ) ) > Beam%Box%z ) THEN
+       h = ( Beam%Box%z - ABS( x0( 2 ) ) ) / ABS( urayt( 2 ) )
+       x2( 1 ) = x0( 1 ) + h * urayt( 1 )
+       x2( 2 ) = SIGN( Beam%Box%z, x0( 2 ) )
     END IF
 
     ! top crossing

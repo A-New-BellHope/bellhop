@@ -155,6 +155,15 @@ only used in conjunction with Cerveny beams, and the Cerveny 3D influence
 function `Influence3D` was removed from `BELLHOP3D` before the earliest version
 we have.
 
+### New in 2022: Nx2D Beam Box uninitialized value
+
+For BELLHOP3D (3D or Nx2D), `Beam%Box%x,y,z` are initialized, and for BELLHOP
+(2D), `Beam%Box%r,z` are initialized. However, in Nx2D, `TraceRay2D` calls
+`Step2D`. For the new `ray mask using a box centered at` (i.e. Step to Beam
+Box) feature, this uses `Beam%Box%r,z` for 2D (which now includes Nx2D) and
+`Beam%Box%x,y,z` for 3D. The value of `Beam%Box%r` read here is uninitialized.
+This has been initialized to `sqrt(x ** 2 + y ** 2)`, but there are bigger
+problems with Nx2D ReduceStep2D / StepToBdry2D, see below.
 
 ## Missing checks
 
@@ -302,6 +311,12 @@ Gaussian 3D ray-centered also initializes `deltaA`, `irA`, and `mA` before the
 stepping loop, but their values are immediately overwritten. It also sets `irA`
 to zero with a comment that this is a flag, but there is no code to check this
 condition.
+
+
+# Issues which could not be fixed in BELLHOP / BELLHOP3D
+
+
+
 
 # Detailed information on some changes
 

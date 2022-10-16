@@ -71,8 +71,9 @@ PROGRAM BELLHOP3D
   USE FatalError
 
   IMPLICIT NONE
-  LOGICAL,   PARAMETER :: ThreeD = .TRUE.
   CHARACTER ( LEN=80 ) :: FileRoot
+
+  ThreeD = .TRUE.
 
   ! get the file root for naming all input and output files
   ! should add some checks here ...
@@ -105,12 +106,11 @@ SUBROUTINE BellhopCore
   USE ArrMod
   USE WriteRay
 
-  LOGICAL,   PARAMETER :: ThreeD = .TRUE.
   INTEGER,   PARAMETER :: ArrivalsStorage = 400000000
   INTEGER              :: IBPvec( 1 ), ibp, iBeamWindow2, irz, itheta, isx, isy, isz, iRec, ir
   REAL      ( KIND=8 ) :: Tstart, Tstop
   REAL      ( KIND=8 ) :: Amp0, RadMax, S
-  REAL      ( KIND=8 ) :: c0, cimag0, gradc( 3 ), cxx, cyy, czz, cxy, cxz, cyz, rho, xs( 3 )
+  REAL      ( KIND=8 ) :: c0, cimag0, gradc( 3 ), cxx, cyy, czz, cxy, cxz, cyz, rho
   REAL      ( KIND=8 ) :: tdummy( 3 )
   REAL      ( KIND=8 ), ALLOCATABLE :: x_rcvrMat( :, :, : ), t_rcvr( :, : )
   COMPLEX   ( KIND=8 ) :: epsilon( 2 )
@@ -191,22 +191,22 @@ SUBROUTINE BellhopCore
            U = 0.0
            
            ! IF ( r( 1 ) == 0.0 ) r( 1 ) = 1.0
-           xs = [ Pos%sx( isx ), Pos%sy( isy ), Pos%sz( isz ) ]
+           xs_3D = [ Pos%sx( isx ), Pos%sy( isy ), Pos%sz( isz ) ]
            WRITE( PRTFile, * )
-           WRITE( PRTFile, "( 'xs = ', G11.3, 2X, G11.3, 2X, G11.3 )" ) xs
+           WRITE( PRTFile, "( 'xs = ', G11.3, 2X, G11.3, 2X, G11.3 )" ) xs_3D
 
            ! positions of rcvrs in the x-y plane; this is pre-calculated for InfluenceGeoHatCart
            ! It is not clear that the pre-calculation saves time ...
            DO ir = 1, Pos%NRr
               DO itheta = 1, Pos%Ntheta
-                 x_rcvrMat( 1 : 2, itheta, ir ) = xs( 1 : 2 ) + Pos%Rr( ir ) * t_rcvr( :, itheta )  ! x-y coordinate of the receiver
+                 x_rcvrMat( 1 : 2, itheta, ir ) = xs_3D( 1 : 2 ) + Pos%Rr( ir ) * t_rcvr( :, itheta )  ! x-y coordinate of the receiver
               END DO
            END DO
   
            ! *** Compute 'optimal' beam constant ***
 
            tdummy = [ 0.0, 0.0, 1.0 ]
-           CALL EvaluateSSP3D( xs, tdummy, c0, cimag0, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
+           CALL EvaluateSSP3D( xs_3D, tdummy, c0, cimag0, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
            ray2D( 1 )%c = c0
            ray3D( 1 )%c = c0
            CALL PickEpsilon( Beam%Type( 1 : 2 ), omega, c0, Angles%Dalpha, Angles%Dbeta, Beam%rLoop, Beam%epsMultiplier, epsilon ) ! beam constant
@@ -215,12 +215,12 @@ SUBROUTINE BellhopCore
 
            AzimuthalAngle: DO ibeta = 1, Angles%Nbeta ! this is also the receiver bearing angle for a 2D run 
               SrcAzimAngle = RadDeg * Angles%beta( ibeta )           ! take-off azimuthal   angle in degrees
-              !if ( ibeta > 27 .and. ibeta < 63 ) cycle AzimuthalAngle
+              !if ( ibeta /= 134 ) cycle AzimuthalAngle
               IF ( Angles%iSingle_beta == 0 .OR. ibeta == Angles%iSingle_beta ) THEN    ! Single beam run?
               !IF ( ibeta == 2 ) THEN    ! Single beam run?
               !IF ( mod( ibeta+1, 2 ) == 0 ) THEN    ! Single beam run?
                 WRITE( PRTFile, FMT = "( 'Tracing azimuthal beam ', I4, F10.2 )" ) ibeta, SrcAzimAngle
-                CALL FLUSH( PRTFile )
+                FLUSH( PRTFile )
                  ! WRITE( *,       FMT = "( 'Tracing beam ', I4, F10.2 )" ) ibeta, RadDeg * Angles%beta( ibeta )
 
                  DeclinationAngle: DO ialpha = 1, Angles%Nalpha
@@ -233,7 +233,7 @@ SUBROUTINE BellhopCore
                            Angles%Nalpha * Angles%Nbeta <= 20000 .OR. MOD( ialpha, 20 ) == 1 ) THEN
                            WRITE( PRTFile, FMT = "( '   Tracing declination beam ', I4, F10.2 )" ) ialpha, SrcDeclAngle
                        END IF
-                       !write( *, * ) '    ialpha', ialpha, SrcDeclAngle
+                       !flush( prtfile )
 
                        IBPvec = maxloc( SrcBmPat( :, 1 ), mask = SrcBmPat( :, 1 ) < SrcDeclAngle )  ! index of ray angle in beam pattern
                        IBP    = IBPvec( 1 )
@@ -246,11 +246,11 @@ SUBROUTINE BellhopCore
 
                        ! Lloyd mirror pattern for semi-coherent option
                        IF ( Beam%RunType( 1 : 1 ) == 'S' ) &
-                          Amp0 = Amp0 * SQRT( 2.0 ) * ABS( SIN( omega / c0 * xs( 3 ) * SIN( Angles%alpha( ialpha ) ) ) )
+                          Amp0 = Amp0 * SQRT( 2.0 ) * ABS( SIN( omega / c0 * xs_3D( 3 ) * SIN( Angles%alpha( ialpha ) ) ) )
 
                        SELECT CASE ( Beam%RunType( 6 : 6 ) )   ! flag for 2D or 3D calculation
                        CASE ( '2' )   ! Nx2D calculation, neglecting horizontal refraction
-                          CALL TraceRay2D(  xs, Angles%alpha( ialpha ), Angles%beta( ibeta ), Amp0 )
+                          CALL TraceRay2D(  Angles%alpha( ialpha ), Angles%beta( ibeta ), Amp0 )
                           IF ( Beam%RunType( 1 : 1 ) /= 'R' ) THEN     ! If not a ray trace run, calculate the field
                              SELECT CASE ( Beam%Type( 1 : 1 ) )
                              CASE ( 'R' )
@@ -268,13 +268,15 @@ SUBROUTINE BellhopCore
                                 CALL InfluenceSGB(             U,       Angles%alpha( ialpha ), Angles%Dalpha, RadMax )
                              CASE ( 'B' )
                                 CALL InfluenceGeoGaussianCart( U,       Angles%alpha( ialpha ), Angles%Dalpha )
-                             CASE DEFAULT
+                             CASE ( 'G', '^', ' ' )
                                 CALL InfluenceGeoHatCart(      U,       Angles%alpha( ialpha ), Angles%Dalpha )
+                             CASE DEFAULT
+                                CALL ERROUT( 'BELLHOP3D', 'Invalid Run Type' )
                              END SELECT
                           END IF
 
                        CASE ( '3' )   ! full 3D calculation
-                          CALL TraceRay3D( xs, Angles%alpha( ialpha ), Angles%beta( ibeta ), epsilon, Amp0 )
+                          CALL TraceRay3D( Angles%alpha( ialpha ), Angles%beta( ibeta ), epsilon, Amp0 )
 
                           IF ( Beam%RunType( 1 : 1 ) /= 'R' ) THEN     ! If not a ray trace run, calculate the field
 
@@ -304,18 +306,18 @@ SUBROUTINE BellhopCore
                                 !                                   ray3D( 1 : Beam%Nsteps )%q_tilde( 2 ) * &
                                 !                                   ray3D( 1 : Beam%Nsteps )%q_hat(   1 )
 
-                                !CALL Influence3D( xs, Angles%alpha( ialpha ), iBeamWindow, P )
+                                !CALL Influence3D_3D( xs_3D, Angles%alpha( ialpha ), iBeamWindow, P )
                              CASE ( 'g' )        ! Geometric-beams with hat-shape
-                                CALL Influence3DGeoHatRayCen(       xs, Angles%alpha( ialpha ), Angles%beta( ibeta ), &
+                                CALL Influence3DGeoHatRayCen(       Angles%alpha( ialpha ), Angles%beta( ibeta ), &
                                                               Angles%Dalpha, Angles%Dbeta, P )
-                             CASE ( 'G', '^' )   ! Geometric-beams with hat-shape in Cartesian coordinates
-                                CALL Influence3DGeoHatCart(         xs, Angles%alpha( ialpha ), Angles%beta( ibeta ), &
+                             CASE ( 'G', '^', ' ' )   ! Geometric-beams with hat-shape in Cartesian coordinates
+                                CALL Influence3DGeoHatCart(         Angles%alpha( ialpha ), Angles%beta( ibeta ), &
                                                               Angles%Dalpha, Angles%Dbeta, P, x_rcvrMat, t_rcvr )
                              CASE ( 'b' )        ! Geometric-beams with Gaussian-shape
-                                CALL Influence3DGeoGaussianRayCen(  xs, Angles%alpha( ialpha ), Angles%beta( ibeta ), &
+                                CALL Influence3DGeoGaussianRayCen(  Angles%alpha( ialpha ), Angles%beta( ibeta ), &
                                                               Angles%Dalpha, Angles%Dbeta, P )
                              CASE ( 'B' )        ! Geometric-beams with Gaussian-shape in Cartesian coordiantes
-                                CALL Influence3DGeoGaussianCart(    xs, Angles%alpha( ialpha ), Angles%beta( ibeta ), &
+                                CALL Influence3DGeoGaussianCart(    Angles%alpha( ialpha ), Angles%beta( ibeta ), &
                                                               Angles%Dalpha, Angles%Dbeta, P, x_rcvrMat, t_rcvr )
                             CASE DEFAULT
                                 CALL ERROUT( 'BELLHOP3D', 'Invalid Run Type' )
@@ -325,7 +327,7 @@ SUBROUTINE BellhopCore
 
                        ! Optionally dump rays to a disk file
                        IF ( Beam%RunType( 1 : 1 ) == 'R' ) THEN
-                          CALL WriteRay3D( Angles%alpha( ialpha ), Angles%beta( ibeta ), Beam%Nsteps, xs )
+                          CALL WriteRay3D( Angles%alpha( ialpha ), Angles%beta( ibeta ), Beam%Nsteps )
                        ENDIF
                     ENDIF   ! closes iSingle test
                  END DO DeclinationAngle
@@ -340,10 +342,14 @@ SUBROUTINE BellhopCore
                     CASE ( 'A' )             ! arrivals calculation, ascii
                        NArr3D( ibeta, :, :    ) = NArr( :, : )
                        Arr3D(  ibeta, :, :, : ) = Arr(  :, :, : )
+                       Arr3D(  ibeta, :, :, : )%SrcAzimAngle  = SNGL( SrcAzimAngle )   ! angle
+                       Arr3D(  ibeta, :, :, : )%RcvrAzimAngle = SNGL( SrcAzimAngle )   ! angle (rcvr angle is same as source angle)
                        Narr = 0   ! this clears out the 2D arrival structure
                     CASE ( 'a' )             ! arrivals calculation, binary
                        NArr3D( ibeta, :, :    ) = NArr( :, : )
                        Arr3D(  ibeta, :, :, : ) = Arr(  :, :, : )
+                       Arr3D(  ibeta, :, :, : )%SrcAzimAngle  = SNGL( SrcAzimAngle )   ! angle
+                       Arr3D(  ibeta, :, :, : )%RcvrAzimAngle = SNGL( SrcAzimAngle )   ! angle (rcvr angle is same as source angle)
                        Narr = 0   ! this clears out the 2D arrival structure
                     END SELECT
                  END IF
@@ -375,9 +381,9 @@ SUBROUTINE BellhopCore
                  END DO RcvrBearing
               END DO
               CASE ( 'A' )             ! arrivals calculation, ascii
-                 CALL WriteArrivalsASCII3D(  Pos%Ntheta, NRz_per_range, Pos%NRr )
+                 CALL WriteArrivalsASCII3D(  Pos%Rr, Pos%Ntheta, NRz_per_range, Pos%NRr )
               CASE ( 'a' )             ! arrivals calculation, binary
-                 CALL WriteArrivalsBinary3D( Pos%Ntheta, NRz_per_range, Pos%NRr )
+                 CALL WriteArrivalsBinary3D( Pos%Rr, Pos%Ntheta, NRz_per_range, Pos%NRr )
            END SELECT
         END DO Source_y
      END DO Source_x
@@ -475,14 +481,13 @@ END SUBROUTINE PickEpsilon
 
 !**********************************************************************!
 
-SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
+SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
 
   ! Traces the beam corresponding to a particular take-off angle
 
   USE ReflectMod
 
   REAL     (KIND=8), INTENT( IN ) :: alpha, beta, Amp0 ! initial angles, amplitude
-  REAL     (KIND=8), INTENT( IN ) :: xs( 3 )     ! x-y-z coordinate of the source
   INTEGER           :: is, is1                   ! index for a step along the ray
   REAL     (KIND=8) :: x( 3 )                    ! ray coordinate
   REAL     (KIND=8) :: t_o( 3 )                  ! tangent in ocean space
@@ -498,9 +503,9 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
   iSmallStepCtr = 0
   tinit = [ COS( alpha ), SIN( alpha ) ]
   tradial = [ COS( beta ), SIN( beta ) ]
-  ray2D( 1 )%x = [ 0.0D0, xs( 3 ) ]
+  ray2D( 1 )%x = [ 0.0D0, xs_3D( 3 ) ]
 
-  ! CALL EvaluateSSP2D( ray2D( 1 )%x, tinit, c, cimag, gradc, crr, crz, czz, rho, xs, tradial, freq )
+  ! CALL EvaluateSSP2D( ray2D( 1 )%x, tinit, c, cimag, gradc, crr, crz, czz, rho, xs_3D, tradial, freq )
   ray2D( 1 )%t         = tinit / ray2D( 1 )%c ! LP: Set before PickEpsilon independent of ray angles; never overwritten
   ray2D( 1 )%p         = [ 1.0, 0.0 ]
   ray2D( 1 )%q         = [ 0.0, 1.0 ]
@@ -517,12 +522,12 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
   t_o( 1 ) = ray2D( 1 )%t( 1 ) * tradial( 1 )
   t_o( 2 ) = ray2D( 1 )%t( 1 ) * tradial( 2 )
   t_o( 3 ) = ray2D( 1 )%t( 2 )
-  CALL GetTopSeg3D( xs, t_o, .TRUE. )   ! identify the top    segment above the source
-  CALL GetBotSeg3D( xs, t_o, .TRUE. )   ! identify the bottom segment below the source
+  CALL GetTopSeg3D( xs_3D, t_o, .TRUE. )   ! identify the top    segment above the source
+  CALL GetBotSeg3D( xs_3D, t_o, .TRUE. )   ! identify the bottom segment below the source
 
   ! Trace the beam (note that Reflect alters the step index is)
   is = 0
-  CALL Distances3D( xs, Topx, Botx, Topn, Botn, DistBegTop, DistBegBot )
+  CALL Distances3D( xs_3D, Topx, Botx, Topn, Botn, DistBegTop, DistBegBot )
 
   IF ( DistBegTop <= 0 .OR. DistBegBot <= 0 ) THEN
      Beam%Nsteps = 1
@@ -533,11 +538,11 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
      is  = is + 1
      is1 = is + 1
 
-     CALL Step2D( ray2D( is ), ray2D( is1 ), xs, tradial )
+     CALL Step2D( ray2D( is ), ray2D( is1 ), tradial )
 
      ! convert polar coordinate of ray to x-y coordinate
-     x( 1 ) = xs( 1 ) + ray2D( is1 )%x( 1 ) * tradial( 1 )
-     x( 2 ) = xs( 2 ) + ray2D( is1 )%x( 1 ) * tradial( 2 )
+     x( 1 ) = xs_3D( 1 ) + ray2D( is1 )%x( 1 ) * tradial( 1 )
+     x( 2 ) = xs_3D( 2 ) + ray2D( is1 )%x( 1 ) * tradial( 2 )
      x( 3 ) = ray2D( is1 )%x( 2 )
      t_o( 1 ) = ray2D( is1 )%t( 1 ) * tradial( 1 )
      t_o( 2 ) = ray2D( is1 )%t( 1 ) * tradial( 2 )
@@ -565,9 +570,9 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
         IF ( atiType == 'C' ) THEN
 
            ! LP: This is superfluous, it's the same x calculated above.
-           x = [ xs( 1 ) + ray2D( is + 1 )%x( 1 ) * tradial( 1 ),   &
-                 xs( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
-                           ray2D( is + 1 )%x( 2 ) ]
+           x = [ xs_3D( 1 ) + ray2D( is + 1 )%x( 1 ) * tradial( 1 ),   &
+                 xs_3D( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
+                              ray2D( is + 1 )%x( 2 ) ]
 
            s1     = ( x( 1 ) - Topx( 1 ) ) / ( xTopSeg( 2 ) - xTopSeg( 1 ) )   ! proportional distance along segment
            s2     = ( x( 2 ) - Topx( 2 ) ) / ( yTopSeg( 2 ) - yTopSeg( 1 ) )   ! proportional distance along segment
@@ -594,21 +599,24 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
            kappa_yy = 0
         END IF
 
-        CALL Reflect2D( is, Bdry%Top%HS, 'TOP', TopnInt, z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy, RTop, NTopPTS, xs, tradial)
+        CALL Reflect2D( is, Bdry%Top%HS, 'TOP', TopnInt, z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy, RTop, NTopPTS, tradial)
         ray2D( is + 1 )%NumTopBnc = ray2D( is )%NumTopBnc + 1
 
-        x = [ xs( 1 ) + ray2D( is + 1 )%x( 1 ) * tradial( 1 ),   &
-              xs( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
-                        ray2D( is + 1 )%x( 2 ) ]
+        x = [ xs_3D( 1 ) + ray2D( is + 1 )%x( 1 ) * tradial( 1 ),   &
+              xs_3D( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
+                           ray2D( is + 1 )%x( 2 ) ]
 
         CALL Distances3D( x, Topx, Botx, Topn, Botn, DistEndTop, DistEndBot )
 
      ELSE IF ( DistBegBot > 0.0d0 .AND. DistEndBot <= 0.0d0 ) THEN  ! test bottom reflection
+        ! write( *, * ) 'Reflecting', x, Botx
++       ! write( *, * ) 'Botn', Botn
++       ! write( *, * ) 'Distances', DistEndTop, DistEndBot
         IF ( btyType == 'C' ) THEN
 
-           x = [ xs( 1 ) + ray2D( is + 1 )%x( 1 ) * tradial( 1 ),   &
-                 xs( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
-                           ray2D( is + 1 )%x( 2 ) ]
+           x = [ xs_3D( 1 ) + ray2D( is + 1 )%x( 1 ) * tradial( 1 ),   &
+                 xs_3D( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
+                              ray2D( is + 1 )%x( 2 ) ]
 
            s1     = ( x( 1 ) - Botx( 1 ) ) / ( xBotSeg( 2 ) - xBotSeg( 1 ) )   ! proportional distance along segment
            s2     = ( x( 2 ) - Botx( 2 ) ) / ( yBotSeg( 2 ) - yBotSeg( 1 ) )   ! proportional distance along segment
@@ -635,12 +643,12 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
            kappa_yy = 0
         END IF
 
-        CALL Reflect2D( is, Bdry%Bot%HS, 'BOT', BotnInt, z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy, RBot, NBotPTS, xs, tradial)
+        CALL Reflect2D( is, Bdry%Bot%HS, 'BOT', BotnInt, z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy, RBot, NBotPTS, tradial)
         ray2D( is + 1 )%NumBotBnc = ray2D( is )%NumBotBnc + 1
 
-        x = [ xs( 1 ) + ray2D( is + 1 )%x( 1 ) * tradial( 1 ),   &
-              xs( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
-                        ray2D( is + 1 )%x( 2 ) ]
+        x = [ xs_3D( 1 ) + ray2D( is + 1 )%x( 1 ) * tradial( 1 ),   &
+              xs_3D( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
+                           ray2D( is + 1 )%x( 2 ) ]
 
         CALL Distances3D( x, Topx, Botx, Topn, Botn, DistEndTop, DistEndBot )
 
@@ -655,9 +663,10 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
      term_miny = MAX( Bot( 1,            1 )%x( 2 ), Top( 1,            1 )%x( 2 ) )
      term_maxx = MIN( Bot( NBTYPts( 1 ), 1 )%x( 1 ), Top( NATIPts( 1 ), 1 )%x( 1 ) )
      term_maxy = MIN( Bot( 1, NBTYPts( 2 ) )%x( 2 ), Top( 1, NATIPts( 2 ) )%x( 2 ) )
-     IF ( ABS( x( 1 ) - xs( 1 ) ) > Beam%Box%x .OR. &
-          ABS( x( 2 ) - xs( 2 ) ) > Beam%Box%y .OR. &
-          ABS( x( 3 ) - xs( 3 ) ) > Beam%Box%z .OR. &
+     !!!IF ( ABS( x( 1 ) - xs( 1 ) ) > Beam%Box%x .OR. &
+     !!!     ABS( x( 2 ) - xs( 2 ) ) > Beam%Box%y .OR. &
+     !!!     ABS( x( 3 )           ) > Beam%Box%z .OR. &  ! LP: Removed xs( 3 ) for consistency
+     IF( &
           x( 1 ) < term_minx .OR. &
           x( 2 ) < term_miny .OR. &
           x( 1 ) > term_maxx .OR. &
@@ -667,7 +676,7 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
           ( x( 1 ) == term_maxx .AND. t_o( 1 ) > 0.0 ) .OR. &
           ( x( 2 ) == term_maxy .AND. t_o( 2 ) > 0.0 ) .OR. &
           ray2D( is + 1 )%Amp < 0.005 .OR. &
-          ray2D( is + 1 )%t( 1 ) < 0  .OR. & ! kills off a backward traveling ray
+          ! ray2D( is + 1 )%t( 1 ) < 0  .OR. & ! kills off a backward traveling ray
           iSmallStepCtr > 50 ) THEN
         Beam%Nsteps = is + 1
         EXIT Stepping
@@ -687,7 +696,7 @@ END SUBROUTINE TraceRay2D
 
 ! **********************************************************************!
 
-SUBROUTINE Step2D( ray0, ray2, xs, tradial )
+SUBROUTINE Step2D( ray0, ray2, tradial )
 
   ! Does a single step along the ray
   ! x denotes the ray coordinate, (r,z)
@@ -696,7 +705,7 @@ SUBROUTINE Step2D( ray0, ray2, xs, tradial )
 
   USE Step3DMod
 
-  REAL (KIND=8), INTENT( IN ) :: xs( 3 ), tradial( 2 )   ! coordinate of source and ray bearing angle
+  REAL (KIND=8), INTENT( IN ) :: tradial( 2 )   ! coordinate of source and ray bearing angle
   TYPE( ray2DPt )    :: ray0, ray1, ray2
   INTEGER            :: iSegx0, iSegy0, iSegz0
   REAL     (KIND=8 ) :: gradc0( 2 ), gradc1( 2 ), gradc2( 2 ), rho, &
@@ -712,7 +721,7 @@ SUBROUTINE Step2D( ray0, ray2, xs, tradial )
 
   ! *** Phase 1 (an Euler step)
 
-  CALL EvaluateSSP2D( ray0%x, ray0%t, c0, cimag0, gradc0, crr0, crz0, czz0, rho, xs, tradial, freq )
+  CALL EvaluateSSP2D( ray0%x, ray0%t, c0, cimag0, gradc0, crr0, crz0, czz0, rho, xs_3D, tradial, freq )
 
   csq0      = c0 * c0
   cnn0_csq0 = crr0 * ray0%t( 2 )**2 - 2.0 * crz0 * ray0%t( 1 ) * ray0%t( 2 ) + czz0 * ray0%t( 1 )**2
@@ -724,8 +733,8 @@ SUBROUTINE Step2D( ray0, ray2, xs, tradial )
   h = Beam%deltas            ! initially set the step h, to the basic one, deltas
 
   urayt0 = c0 * ray0%t  ! unit tangent
-  rayx3D = [ xs( 1 ) + ray0%x( 1 ) * tradial( 1 ), xs( 2 ) + ray0%x( 1 ) * tradial( 2 ), ray0%x( 2 ) ]
-  rayt3D = [           urayt0( 1 ) * tradial( 1 ),           urayt0( 1 ) * tradial( 2 ), urayt0( 2 ) ]
+  rayx3D = [ xs_3D( 1 ) + ray0%x( 1 ) * tradial( 1 ), xs( 2 ) + ray0%x( 1 ) * tradial( 2 ), ray0%x( 2 ) ]
+  rayt3D = [              urayt0( 1 ) * tradial( 1 ),           urayt0( 1 ) * tradial( 2 ), urayt0( 2 ) ]
 
   CALL ReduceStep3D( rayx3D, rayt3D, iSegx0, iSegy0, iSegz0, h ) ! reduce h to land on boundary
 
@@ -738,7 +747,7 @@ SUBROUTINE Step2D( ray0, ray2, xs, tradial )
 
   ! *** Phase 2
 
-  CALL EvaluateSSP2D( ray1%x, ray1%t, c1, cimag1, gradc1, crr1, crz1, czz1, rho, xs, tradial, freq )
+  CALL EvaluateSSP2D( ray1%x, ray1%t, c1, cimag1, gradc1, crr1, crz1, czz1, rho, xs_3D, tradial, freq )
   csq1      = c1 * c1
   cnn1_csq1 = crr1 * ray1%t( 2 )**2 - 2.0 * crz1 * ray1%t( 1 ) * ray1%t( 2 ) + czz1 * ray1%t( 1 )**2
 
@@ -771,7 +780,7 @@ SUBROUTINE Step2D( ray0, ray2, xs, tradial )
 
   ! If we crossed an interface, apply jump condition
 
-  CALL EvaluateSSP2D( ray2%x, ray2%t, c2, cimag2, gradc2, crr2, crz2, czz2, rho, xs, tradial, freq )
+  CALL EvaluateSSP2D( ray2%x, ray2%t, c2, cimag2, gradc2, crr2, crz2, czz2, rho, xs_3D, tradial, freq )
   ray2%c = c2
 
   !!! this needs modifying like the full 3D version to handle jumps in the x-y direction
@@ -793,15 +802,14 @@ END SUBROUTINE Step2D
 
 !**********************************************************************!
 
-SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
+SUBROUTINE TraceRay3D( alpha, beta, epsilon, Amp0 )
 
   ! Traces the beam corresponding to a particular take off angle
 
   USE Step3DMod
   USE Reflect3DMod
-  USE norms
 
-  REAL     ( KIND=8 ), INTENT( IN ) :: xs( 3 ), Amp0  ! source coordinate, initial amplitude
+  REAL     ( KIND=8 ), INTENT( IN ) :: Amp0  ! initial amplitude
   REAL     ( KIND=8 ), INTENT( IN ) :: alpha, beta    ! take-off angles of the ray
   COMPLEX  ( KIND=8 ), INTENT( IN ) :: epsilon( 2 )   ! beam initial conditions
   INTEGER             :: is, is1
@@ -817,7 +825,7 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
   ! *** Initial conditions ***
 
   iSmallStepCtr = 0
-  ray3D( 1 )%x    = xs
+  ray3D( 1 )%x    = xs_3D
   tinit = [ COS( alpha ) * COS( beta ), COS( alpha ) * SIN( beta ), SIN( alpha ) ]
   !CALL EvaluateSSP3D(  ray3D( 1 )%x, tinit, c, cimag, gradc, cxx, cyy, czz, cxy, cxz, cyz, rho, freq, 'TAB' )
 
@@ -852,8 +860,8 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
   xBotSeg = [ +big, -big ]
   yBotSeg = [ +big, -big ]
     
-  CALL GetTopSeg3D( xs, ray3D( 1 )%t, .TRUE. )   ! identify the top    segment above the source
-  CALL GetBotSeg3D( xs, ray3D( 1 )%t, .TRUE. )   ! identify the bottom segment below the source
+  CALL GetTopSeg3D( xs_3D, ray3D( 1 )%t, .TRUE. )   ! identify the top    segment above the source
+  CALL GetBotSeg3D( xs_3D, ray3D( 1 )%t, .TRUE. )   ! identify the bottom segment below the source
   
   ! Trace the beam (note that Reflect alters the step index is)
   is = 0
@@ -955,7 +963,7 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
 
      END IF
 
-     ! Has the ray left the box, lost its energy, escaped the boundaries, or exceeded storage limit?
+     ! Has the ray exited the beam box, lost its energy, escaped the BTY, ATI boundaries, or exceeded storage limit?
      ! LP: See explanation for changes in bdry3DMod: GetTopSeg3D.
      term_x = ray3D( is + 1 )%x
      term_t = ray3D( is + 1 )%t
@@ -963,9 +971,10 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
      term_miny = MAX( Bot( 1,            1 )%x( 2 ), Top( 1,            1 )%x( 2 ) )
      term_maxx = MIN( Bot( NBTYPts( 1 ), 1 )%x( 1 ), Top( NATIPts( 1 ), 1 )%x( 1 ) )
      term_maxy = MIN( Bot( 1, NBTYPts( 2 ) )%x( 2 ), Top( 1, NATIPts( 2 ) )%x( 2 ) )
-     IF ( ABS( term_x( 1 ) - xs( 1 ) ) > Beam%Box%x .OR. &
-          ABS( term_x( 2 ) - xs( 2 ) ) > Beam%Box%y .OR. &
-          ABS( term_x( 3 ) - xs( 3 ) ) > Beam%Box%z .OR. &
+     IF ( &
+          ABS( term_x( 1 ) - xs_3D( 1 ) ) > Beam%Box%x .OR. &
+          ABS( term_x( 2 ) - xs_3D( 2 ) ) > Beam%Box%y .OR. &
+          ABS( term_x( 3 )              ) > Beam%Box%z .OR. & ! box is centered at z=0
           term_x( 1 ) < term_minx .OR. &
           term_x( 2 ) < term_miny .OR. &
           term_x( 1 ) > term_maxx .OR. &
@@ -997,6 +1006,8 @@ SUBROUTINE Distances3D( rayx, Topx, Botx, Topn, Botn, DistTop, DistBot )
 
   ! Computes distances from ray to boundaries
   ! Formula differs from JKPS because code uses outward pointing normals
+  ! Note that Topx, Botx, just need to be any node on the diagonal that divides each square into triangles
+  ! In bdry3DMod, the node is selected as the one at the lowest x, y, index and that defines the triangles
 
   REAL (KIND=8), INTENT( IN  ) :: rayx( 3 )             ! ray coordinate
   REAL (KIND=8), INTENT( IN  ) :: Topx( 3 ), Botx( 3 )  ! top, bottom boundary coordinate for node
@@ -1008,7 +1019,14 @@ SUBROUTINE Distances3D( rayx, Topx, Botx, Topn, Botn, DistTop, DistBot )
   dBot    = rayx - Botx  ! vector pointing from bottom to ray
   DistTop = -DOT_PRODUCT( Topn, dTop )
   DistBot = -DOT_PRODUCT( Botn, dBot )
-
+  
+!!$  write( *, * )
+!!$  write( *, * ) 'Distances3D', DistBot
+!!$  write( *, * ) 'rayx', rayx
+!!$  write( *, * ) 'Botx', Botx
+!!$  write( *, * ) 'dBot', dBot
+!!$  write( *, * ) 'Normal', Botn
+!!$  write( *, * )
 END SUBROUTINE Distances3D
 
 END PROGRAM BELLHOP3D

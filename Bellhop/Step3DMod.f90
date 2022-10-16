@@ -50,6 +50,10 @@ CONTAINS
     ! However, it's modified to allow for a dynamic step change, while preserving the second-order accuracy).
 
     ! *** Phase 1 (an Euler step)
+    
+    !write( *, * ) '______________________________________________________________'
+    !write( *, * ) 'in segment ', ISegBoty
+    !write( *, * ) 'current coord ', ray0%x
 
     CALL EvaluateSSP3D( ray0%x, ray0%t, c0, cimag0, gradc0, cxx0, cyy0, czz0, cxy0, cxz0, cyz0, rho, freq, 'TAB' )
     CALL RayNormal( ray0%t, ray0%phi, c0, e1, e2 ) ! Compute ray normals e1 and e2
@@ -95,6 +99,7 @@ CONTAINS
     ! ( ray2%x ) gets put precisely on the boundary.
     CALL StepToBdry3D( ray0%x, ray2%x, urayt2, iSegx0, iSegy0, iSegz0, h, &
        topRefl, botRefl, flipTopDiag, flipBotDiag )
+    !write( *, * ) 'final coord ', ray2%x, w0, w1
     
     ! Update other variables with this new h
     ! LP: Fixed: ray2%phi now depends on hw0 & hw1 like the other parameters,
@@ -279,15 +284,15 @@ CONTAINS
     INTEGER,       INTENT( IN    ) :: iSegx0, iSegy0, iSegz0
     REAL (KIND=8), INTENT( IN    ) :: x0( 3 ), urayt( 3 )  ! ray coordinate and tangent
     REAL (KIND=8), INTENT( INOUT ) :: h                    ! reduced step size
+    REAL (KIND=8) :: hInt, hBoxx, hBoxy, hBoxz, hTop, hBot, hxSeg, hySeg, hTopDiag, hBotDiag ! step sizes
     REAL (KIND=8) :: d( 3 ), d0( 3 ), tri_n( 3 )
-    REAL (KIND=8) :: x( 3 )                              ! ray coordinate after full trial step
-    REAL (KIND=8) :: h1, h2, h3, h4, h5, h6, h7          ! step sizes
+    REAL (KIND=8) :: x( 3 )                                ! ray coordinate after full trial step
     REAL (KIND=8) :: xSeg( 2 ), ySeg( 2 )
 
     IF ( STEP_DEBUGGING ) &
        WRITE( PRTFile, * ) 'ReduceStep3D'
 
-    ! Detect interface or boundary crossing and reduce step, if necessary, to land on that crossing.
+    ! Detect SSP interface or boundary crossing and reduce step, if necessary, to land on that crossing.
     ! Keep in mind possibility that user put source right on an interface
     ! and that multiple events can occur (crossing interface, top, and bottom in a single step).
 
@@ -297,45 +302,66 @@ CONTAINS
     ! Step reduction is not done for the top or bottom layer
     ! Instead the SSP is extrapolated
     ! This prevents problems when the boundaries are outside the domain of the SSP
-    h1 = huge( h1 )
-    IF ( ABS( urayt( 3 ) ) > EPSILON( h1 ) ) THEN
-       IF      ( SSP%z( iSegz0     ) > x(  3 ) .AND. iSegz0     > 1  ) THEN
-          h1 = ( SSP%z( iSegz0     ) - x0( 3 ) ) / urayt( 3 )
+    hInt = huge( hInt )
+    IF ( ABS( urayt( 3 ) ) > EPSILON( hInt ) ) THEN
+       IF        ( SSP%z( iSegz0     ) > x(  3 ) .AND. iSegz0     > 1  ) THEN
+          hInt = ( SSP%z( iSegz0     ) - x0( 3 ) ) / urayt( 3 )
           IF ( STEP_DEBUGGING ) &
-             WRITE( PRTFile, * ) 'Shallower bound SSP Z > z; h', SSP%z( iSegz0     ), x( 3 ), h1
-       ELSE IF ( SSP%z( iSegz0 + 1 ) < x(  3 ) .AND. iSegz0 + 1 < SSP%Nz ) THEN
-          h1 = ( SSP%z( iSegz0 + 1 ) - x0( 3 ) ) / urayt( 3 )
+             WRITE( PRTFile, * ) 'Shallower bound SSP Z > z; hInt', SSP%z( iSegz0     ), x( 3 ), hInt
+       ELSE IF   ( SSP%z( iSegz0 + 1 ) < x(  3 ) .AND. iSegz0 + 1 < SSP%Nz ) THEN
+          hInt = ( SSP%z( iSegz0 + 1 ) - x0( 3 ) ) / urayt( 3 )
           IF ( STEP_DEBUGGING ) &
-             WRITE( PRTFile, * ) 'Deeper bound SSP Z < z; h', SSP%z( iSegz0 + 1 ), x( 3 ), h1
+             WRITE( PRTFile, * ) 'Deeper bound SSP Z < z; hInt', SSP%z( iSegz0 + 1 ), x( 3 ), hInt
        END IF
+    END IF
+    
+    ! ray mask using a box centered at ( xs_3D( 1 ), xs_3D( 2 ), 0 )
+    hBoxx    = huge( hBoxx )
+    IF ( ABS( x( 1 ) - xs_3D( 1 ) ) > Beam%Box%x ) THEN
+       hBoxx = ( Beam%Box%x - ABS( ( x0( 1 ) - xs_3D( 1 ) ) ) ) / ABS( urayt( 1 ) )
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'Beam box crossing X, hBoxx', Beam%Box%x, hBoxx
+    END IF
+    
+    hBoxy    = huge( hBoxy )
+    IF ( ABS( x( 2 ) - xs_3D( 2 ) ) > Beam%Box%y ) THEN
+       hBoxy = ( Beam%Box%y - ABS( ( x0( 2 ) - xs_3D( 2 ) ) ) ) / ABS( urayt( 2 ) )
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'Beam box crossing Y, hBoxy', Beam%Box%y, hBoxy
+    END IF
+    
+    hBoxz    = huge( hBoxz )
+    IF ( ABS( x( 3 )              ) > Beam%Box%z ) THEN
+       hBoxz = ( Beam%Box%z - ABS(   x0( 3 )                ) ) / ABS( urayt( 3 ) )
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'Beam box crossing Z, hBoxz', Beam%Box%z, hBoxz
     END IF
 
     ! top crossing
-    h2 = huge( h2 )
-    d  = x - Topx              ! vector from top to ray
-    ! LP: Changed from EPSILON( h1 ) (should have been h2!) to 0 in conjunction 
-    ! with StepToBdry3D change here.
+    hTop = huge( hTop )
+    d    = x - Topx       ! vector from top to ray
+    ! LP: Changed from EPSILON( hTop ) to 0 in conjunction with StepToBdry3D change here.
     IF ( DOT_PRODUCT( Topn, d )  >= 0.0D0 ) THEN
-       d0 = x0 - Topx   ! vector from top    node to ray origin
-       h2 = -DOT_PRODUCT( d0, Topn ) / DOT_PRODUCT( urayt, Topn )
+       d0   = x0 - Topx   ! vector from top    node to ray origin
+       hTop = -DOT_PRODUCT( d0, Topn ) / DOT_PRODUCT( urayt, Topn )
        IF ( STEP_DEBUGGING ) &
-          WRITE( PRTFile, * ) 'Top crossing h', h2
+          WRITE( PRTFile, * ) 'Top crossing hTop', hTop
     END IF
 
     ! bottom crossing
-    h3 = huge( h3 )
-    d  = x - Botx              ! vector from bottom to ray
+    hBot = huge( hBot )
+    d    = x - Botx       ! vector from bottom to ray
     ! LP: Changed from EPSILON( h1 ) (should have been h3!) to 0 in conjunction 
     ! with StepToBdry3D change here.
     IF ( DOT_PRODUCT( Botn, d ) >= 0.0D0 ) THEN
-       d0 = x0 - Botx   ! vector from bottom node to ray origin
-       h3 = -DOT_PRODUCT( d0, Botn ) / DOT_PRODUCT( urayt, Botn )
+       d0   = x0 - Botx   ! vector from bottom node to ray origin
+       hBot = -DOT_PRODUCT( d0, Botn ) / DOT_PRODUCT( urayt, Botn )
        IF ( STEP_DEBUGGING ) &
-          WRITE( PRTFile, * ) 'Bottom crossing h', h3
+          WRITE( PRTFile, * ) 'Bottom crossing hBot', hBot
     END IF
 
-    ! top/bottom segment crossing in x
-    h4 = huge( h4 )
+    ! top/bottom/ocean segment crossing in x
+    hxSeg = huge( hxSeg )
     xSeg( 1 ) = MAX( xTopSeg( 1 ), xBotSeg( 1 ) )
     xSeg( 2 ) = MIN( xTopSeg( 2 ), xBotSeg( 2 ) )
     
@@ -344,20 +370,20 @@ CONTAINS
        xSeg( 2 ) = MIN( xSeg( 2 ), SSP%Seg%x( iSegx0 + 1 ) )
     END IF
 
-    IF ( ABS( urayt( 1 ) ) > EPSILON( h1 ) ) THEN
-       IF       ( x(  1 ) < xSeg( 1 ) ) THEN
-          h4 = -( x0( 1 ) - xSeg( 1 ) ) / urayt( 1 )
+    IF ( ABS( urayt( 1 ) ) > EPSILON( hxSeg ) ) THEN
+       IF          ( x(  1 ) < xSeg( 1 ) ) THEN
+          hxSeg = -( x0( 1 ) - xSeg( 1 ) ) / urayt( 1 )
           IF ( STEP_DEBUGGING ) &
-             WRITE( PRTFile, * ) 'Min bound SSP X > x; h', xSeg( 1 ), x( 1 ), h4
-       ELSE IF  ( x(  1 ) > xSeg( 2 ) ) THEN
-          h4 = -( x0( 1 ) - xSeg( 2 ) ) / urayt( 1 )
+             WRITE( PRTFile, * ) 'Min bound SSP X > x; hxSeg', xSeg( 1 ), x( 1 ), hxSeg
+       ELSE IF     ( x(  1 ) > xSeg( 2 ) ) THEN
+          hxSeg = -( x0( 1 ) - xSeg( 2 ) ) / urayt( 1 )
           IF ( STEP_DEBUGGING ) &
-             WRITE( PRTFile, * ) 'Max bound SSP X < x; h', xSeg( 2 ), x( 1 ), h4
+             WRITE( PRTFile, * ) 'Max bound SSP X < x; hxSeg', xSeg( 2 ), x( 1 ), hxSeg
        END IF
     END IF
 
-    ! top/bottom segment crossing in y
-    h5 = huge( h5 )
+    ! top/bottom/ocean segment crossing in y
+    hySeg = huge( hySeg )
     ySeg( 1 ) = MAX( yTopSeg( 1 ), yBotSeg( 1 ) )
     ySeg( 2 ) = MIN( yTopSeg( 2 ), yBotSeg( 2 ) )
 
@@ -368,59 +394,59 @@ CONTAINS
 
     ! LP: removed 1000 * epsilon which mbp had comment questioning also
     IF ( ABS( urayt( 2 ) ) > EPSILON( h1 ) ) THEN
-       IF       ( x(  2 ) < ySeg( 1 ) ) THEN
-          h5 = -( x0( 2 ) - ySeg( 1 ) ) / urayt( 2 )
+       IF          ( x(  2 ) < ySeg( 1 ) ) THEN
+          hySeg = -( x0( 2 ) - ySeg( 1 ) ) / urayt( 2 )
           IF ( STEP_DEBUGGING ) &
-             WRITE( PRTFile, * ) 'Min bound SSP Y > y; h', ySeg( 1 ), x( 2 ), h5
-       ELSE IF  ( x(  2 ) > ySeg( 2 ) ) THEN
-          h5 = -( x0( 2 ) - ySeg( 2 ) ) / urayt( 2 )
+             WRITE( PRTFile, * ) 'Min bound SSP Y > y; hySeg', ySeg( 1 ), x( 2 ), hySeg
+       ELSE IF     ( x(  2 ) > ySeg( 2 ) ) THEN
+          hySeg = -( x0( 2 ) - ySeg( 2 ) ) / urayt( 2 )
           IF ( STEP_DEBUGGING ) &
-             WRITE( PRTFile, * ) 'Max bound SSP Y < y; h', ySeg( 2 ), x( 2 ), h5
+             WRITE( PRTFile, * ) 'Max bound SSP Y < y; hySeg', ySeg( 2 ), x( 2 ), hySeg
        END IF
     END IF
 
     ! triangle crossing within a top segment
-    h6    = huge( h6 )
+    hTopDiag = huge( hTopDiag )
     d     = x  - Topxmid   ! vector from bottom center to ray end
     d0    = x0 - Topxmid   ! vector from bottom center to ray origin
     tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ), 0.0d0 ]
     tri_n = tri_n / NORM2( tri_n )
 
     IF ( CheckDiagCrossing( tri_n, d, Top_tridiag_pos ) ) THEN
-       h6 = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       IF ( h6 < 0.0D0 ) THEN
-          IF ( h6 <= -1.0D-3 .AND. ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
+       hTopDiag = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
+       IF ( hTopDiag < 0.0D0 ) THEN
+          IF ( hTopDiag <= -1.0D-3 .AND. ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
              CALL ERROUT( 'ReduceStep3D', 'Bad top tri diag crossing' )
           END IF
-          h6 = 0.0D0
+          hTopDiag = 0.0D0
        END IF
        IF ( STEP_DEBUGGING ) &
-          WRITE( PRTFile, * ) 'Top tri diag crossing h dot(n, d0) dot(n, d)', &
-          h6, DOT_PRODUCT( tri_n, d0 ), DOT_PRODUCT( tri_n, d )
+          WRITE( PRTFile, * ) 'Top tri diag crossing hTopDiag dot(n, d0) dot(n, d)', &
+          hTopDiag, DOT_PRODUCT( tri_n, d0 ), DOT_PRODUCT( tri_n, d )
     END IF
 
     ! triangle crossing within a bottom segment
-    h7    = huge( h7 )
+    hBotDiag = huge( hBotDiag )
     d     = x  - Botxmid   ! vector from bottom center to ray end
     d0    = x0 - Botxmid   ! vector from bottom center to ray origin
     tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ), 0.0d0 ]
     tri_n = tri_n / NORM2( tri_n )
 
     IF ( CheckDiagCrossing( tri_n, d, Bot_tridiag_pos ) ) THEN
-       h7 = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       IF ( h7 < 0.0D0 ) THEN
-          IF ( h7 <= -1.0D-3 .AND. ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
+       hBotDiag = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
+       IF ( hBotDiag < 0.0D0 ) THEN
+          IF ( hBotDiag <= -1.0D-3 .AND. ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
              ! WRITE( PRTFile, * ) 'h7 dot', h7, DOT_PRODUCT( urayt, tri_n )
              CALL ERROUT( 'ReduceStep3D', 'Bad bot tri diag crossing' )
           END IF
-          h7 = 0.0D0
+          hBotDiag = 0.0D0
        END IF
        IF ( STEP_DEBUGGING ) &
-          WRITE( PRTFile, * ) 'Bot tri diag crossing h dot(n, d0) dot(n, d)', &
-          h7, DOT_PRODUCT( tri_n, d0 ), DOT_PRODUCT( tri_n, d )
+          WRITE( PRTFile, * ) 'Bot tri diag crossing hBotDiag dot(n, d0) dot(n, d)', &
+          hBotDiag, DOT_PRODUCT( tri_n, d0 ), DOT_PRODUCT( tri_n, d )
     END IF
-
-    h = MIN( h, h1, h2, h3, h4, h5, h6, h7 )  ! take limit set by shortest distance to a crossing
+    
+    h = MIN( h, hInt, hBoxx, hBoxy, hBoxz, hTop, hBot, hxSeg, hySeg, hTopDiag, hBotDiag )  ! take limit set by shortest distance to a crossing
     IF ( h < -1d-4 ) THEN
        CALL ERROUT( 'ReduceStep3D', 'negative h' )
     END IF
@@ -465,6 +491,29 @@ CONTAINS
           IF ( STEP_DEBUGGING ) &
              WRITE( PRTFile, * ) 'StepToBdry3D deeper h to', h, x2
        END IF
+    END IF
+
+    ! ray mask using a box centered at ( xs_3D( 1 ), xs_3D( 2 ), 0 )
+    IF ( ABS( x2( 1 ) - xs_3D( 1 ) ) > Beam%Box%x ) THEN
+       h = ( Beam%Box%x - ABS( ( x0( 1 ) - xs_3D( 1 ) ) ) ) / ABS( urayt( 1 ) )
+       x2 = x0 + h * urayt
+       x2( 1 ) = xs_3D( 1 ) + SIGN( Beam%Box%x, x0( 1 ) - xs_3D( 1 ) )
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'StepToBdry3D beam box crossing X h to', h, x2
+    END IF
+    IF ( ABS( x2( 2 ) - xs_3D( 2 ) ) > Beam%Box%y ) THEN
+       h = ( Beam%Box%y - ABS( ( x0( 2 ) - xs_3D( 2 ) ) ) ) / ABS( urayt( 2 ) )
+       x2 = x0 + h * urayt
+       x2( 2 ) = xs_3D( 2 ) + SIGN( Beam%Box%y, x0( 2 ) - xs_3D( 2 ) )
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'StepToBdry3D beam box crossing Y h to', h, x2
+    END IF
+    IF ( ABS( x2( 3 )              ) > Beam%Box%z ) THEN
+       h = ( Beam%Box%z - ABS(   x0( 3 )                ) ) / ABS( urayt( 3 ) )
+       x2 = x0 + h * urayt
+       x2( 3 ) =              SIGN( Beam%Box%z, x0( 3 )              )
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'StepToBdry3D beam box crossing Y h to', h, x2
     END IF
 
     ! top crossing

@@ -1,10 +1,10 @@
 
 EXECUTABLES = bellhop.exe bellhop3d.exe
 
-BELLHOP_OBJECTS   = angleMod.o ArrMod.o bdryMod.o   bellhopMod.o sspMod.o ReflectMod.o                       WriteRay.o              influence.o               Step.o   ReadEnvironmentBell.o bellhop.o ../misc/libmisc.a
+BELLHOP_OBJECTS   = bellhopMod.o angleMod.o ArrMod.o bdryMod.o   sspMod.o ReflectMod.o                       WriteRay.o              influence.o               Step.o   ReadEnvironmentBell.o bellhop.o ../misc/libmisc.a
 BELLHOP_LIBS = -L../misc -lmisc
 
-BELLHOP3D_OBJECTS = angleMod.o ArrMod.o bdry3DMod.o bellhopMod.o sspMod.o ReflectMod.o Reflect3DMod.o Cone.o WriteRay.o RayNormals.o influence.o influence3D.o Step3DMod.o ReadEnvironmentBell.o bellhop3D.o ../misc/libmisc.a
+BELLHOP3D_OBJECTS = bellhopMod.o angleMod.o ArrMod.o bdry3DMod.o sspMod.o ReflectMod.o Reflect3DMod.o Cone.o WriteRay.o RayNormals.o influence.o influence3D.o Step3DMod.o ReadEnvironmentBell.o bellhop3D.o ../misc/libmisc.a
 BELLHOP3D_LIBS = -L../misc -lmisc
 
 all: $(EXECUTABLES)

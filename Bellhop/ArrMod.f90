@@ -1,12 +1,14 @@
 MODULE ArrMod
 
   USE MathConstants
+  USE BellhopMod
 
   ! Variables for arrival information
   IMPLICIT NONE
-  INTEGER, PARAMETER, PRIVATE :: ARRFile = 36
-  INTEGER                     :: MaxNArr
-  INTEGER, ALLOCATABLE        :: NArr( :, : ), NArr3D( :, :, : )
+  REAL,      PARAMETER :: PhaseTol = 0.05  ! arrivals with essentially the same phase are grouped into one
+  INTEGER               :: MaxNArr
+  INTEGER, ALLOCATABLE  :: NArr( :, : ), NArr3D( :, :, : )
+  REAL         (KIND=4) :: factor = 1.0
 
   TYPE Arrival
      INTEGER :: NTopBnc, NBotBnc
@@ -20,10 +22,9 @@ CONTAINS
 
   SUBROUTINE AddArr( omega, id, ir, Amp, Phase, delay, SrcDeclAngle, RcvrDeclAngle, NumTopBnc, NumBotBnc )
 
-    ! ADDs the amplitude and delay for an ARRival into a matrix of same.
+    ! Adds the amplitude and delay for an ARRival into a matrix of same.
     ! Extra logic included to keep only the strongest arrivals.
 
-    REAL,      PARAMETER :: PhaseTol = 0.05  ! arrivals with essentially the same phase are grouped into one
     INTEGER,              INTENT( IN ) :: NumTopBnc, NumBotBnc, id, ir
     REAL    ( KIND = 8 ), INTENT( IN ) :: omega, Amp, Phase, SrcDeclAngle, RcvrDeclAngle
     COMPLEX ( KIND = 8 ), INTENT( IN ) :: delay
@@ -94,7 +95,6 @@ CONTAINS
     REAL,              INTENT( IN ) :: r( Nr )
     CHARACTER (LEN=1), INTENT( IN ) :: SourceType
     INTEGER           :: ir, id, iArr
-    REAL     (KIND=8) :: factor
 
     WRITE( ARRFile, * ) MAXVAL( NArr( 1 : Nrd, 1 : Nr ) )
 
@@ -115,7 +115,7 @@ CONTAINS
              ! You can compress the output file a lot by putting in an explicit format statement here ...
              ! However, you'll need to make sure you keep adequate precision
              WRITE( ARRFile, * ) &
-             SNGL( factor ) * Arr( id, ir, iArr )%A,             &
+                     factor * Arr( id, ir, iArr )%A,             &
              SNGL( RadDeg ) * Arr( id, ir, iArr )%Phase,         &
                         REAL( Arr( id, ir, iArr )%delay ),       &
                        AIMAG( Arr( id, ir, iArr )%delay ),       &
@@ -125,7 +125,7 @@ CONTAINS
                               Arr( id, ir, iArr )%NBotBnc
           END DO  ! next arrival
        END DO  ! next receiver depth
-    END DO  ! next range
+    END DO  ! next receiver range
 
     RETURN
   END SUBROUTINE WriteArrivalsASCII
@@ -141,7 +141,6 @@ CONTAINS
     REAL,              INTENT( IN ) :: r( Nr )
     CHARACTER (LEN=1), INTENT( IN ) :: SourceType
     INTEGER           :: ir, id, iArr
-    REAL     (KIND=8) :: factor
 
     WRITE( ARRFile ) MAXVAL( NArr( 1 : Nrd, 1 : Nr ) )
 
@@ -162,7 +161,7 @@ CONTAINS
           DO iArr = 1, NArr( id, ir )
              ! integers written out as reals below for fast reading in Matlab
              WRITE( ARRFile ) &
-            SNGL( factor * Arr( id, ir, iArr )%A ),           &
+                  factor * Arr( id, ir, iArr )%A,           &
             SNGL( RadDeg * Arr( id, ir, iArr )%Phase ),       &
                            Arr( id, ir, iArr )%delay,         &
                            Arr( id, ir, iArr )%SrcDeclAngle,  &
@@ -172,7 +171,7 @@ CONTAINS
 
           END DO   ! next arrival
        END DO   ! next receiver depth
-    END DO   ! next range
+    END DO   ! next receiver range
 
     RETURN
   END SUBROUTINE WriteArrivalsBinary
@@ -182,10 +181,9 @@ CONTAINS
   SUBROUTINE AddArr3D( omega, itheta, id, ir, Amp, Phase, delay, SrcDeclAngle, &
        SrcAzimAngle, RcvrDeclAngle, RcvrAzimAngle, NumTopBnc, NumBotBnc )
 
-    ! ADDs the amplitude and delay for an ARRival into a matrix of same.
+    ! Adds the amplitude and delay for an ARRival into a matrix of same.
     ! Extra logic included to keep only the strongest arrivals.
 
-    REAL,                 PARAMETER    :: PhaseTol = 0.5  ! arrivals with essentially the same phase are grouped into one
     INTEGER,              INTENT( IN ) :: itheta, id, ir
     INTEGER,              INTENT( IN ) :: NumTopBnc, NumBotBnc
     REAL    ( KIND = 8 ), INTENT( IN ) :: omega, Amp, Phase, SrcDeclAngle, SrcAzimAngle, RcvrDeclAngle, RcvrAzimAngle
@@ -241,8 +239,8 @@ CONTAINS
        w1     = Arr3D( itheta, id, ir, Nt )%A / AmpTot
        w2     = REAL( Amp ) / AmpTot
 
-       Arr3D( itheta, id, ir, Nt )%delay     = w1 * Arr3D( itheta, id, ir, Nt )%delay     + w2 * CMPLX( delay ) ! weighted sum
-       Arr3D( itheta, id, ir, Nt )%A         = AmpTot
+       Arr3D( itheta, id, ir, Nt )%delay         = w1 * Arr3D( itheta, id, ir, Nt )%delay     + w2 * CMPLX( delay ) ! weighted sum
+       Arr3D( itheta, id, ir, Nt )%A             = AmpTot
        Arr3D( itheta, id, ir, Nt )%SrcDeclAngle  = w1 * Arr3D( itheta, id, ir, Nt )%SrcDeclAngle  + w2 * SNGL( SrcDeclAngle )
        Arr3D( itheta, id, ir, Nt )%SrcAzimAngle  = w1 * Arr3D( itheta, id, ir, Nt )%SrcAzimAngle  + w2 * SNGL( SrcAzimAngle )
        Arr3D( itheta, id, ir, Nt )%RcvrDeclAngle = w1 * Arr3D( itheta, id, ir, Nt )%RcvrDeclAngle + w2 * SNGL( RcvrDeclAngle )
@@ -254,12 +252,13 @@ CONTAINS
 
   ! **********************************************************************!
 
-  SUBROUTINE WriteArrivalsASCII3D( Ntheta, Nrd, Nr )
+  SUBROUTINE WriteArrivalsASCII3D( r, Ntheta, Nrd, Nr )
 
     ! Writes the arrival data (Amplitude, delay for each eigenray)
     ! ASCII output file
 
     INTEGER, INTENT( IN ) :: Ntheta, Nrd, Nr
+    REAL,    INTENT( IN ) :: r( Nr )
     INTEGER               :: itheta, ir, id, iArr
 
     WRITE( ARRFile, * ) MAXVAL( NArr3D( 1 : Ntheta,  1 : Nrd, 1 : Nr ) )
@@ -267,6 +266,13 @@ CONTAINS
     DO itheta = 1, Ntheta
        DO id = 1, Nrd
           DO ir = 1, Nr
+             IF ( Beam%RunType( 6 : 6 ) == '2' ) THEN   ! 2D run?
+                IF ( r ( ir ) == 0 ) THEN
+                   factor = 1e5                   ! avoid /0 at origin
+                ELSE
+                   factor = 1. / SQRT( r( ir ) )  ! cyl. spreading
+                END IF
+             END IF
 
              WRITE( ARRFile, * ) NArr3D( itheta,  id, ir )
 
@@ -274,7 +280,7 @@ CONTAINS
                 ! you can compress the output file a lot by putting in an explicit format statement here ...
                 ! However, you'll need to make sure you keep adequate precision
                 WRITE( ARRFile, * ) &
-                              Arr3D( itheta, id, ir, iArr )%A,             &
+                     factor * Arr3D( itheta, id, ir, iArr )%A,             &
                      RadDeg * Arr3D( itheta, id, ir, iArr )%Phase,         &
                         REAL( Arr3D( itheta, id, ir, iArr )%delay ),       &
                        AIMAG( Arr3D( itheta, id, ir, iArr )%delay ),       &
@@ -286,20 +292,21 @@ CONTAINS
                               Arr3D( itheta, id, ir, iArr )%NBotBnc
              END DO  ! next arrival
           END DO  ! next receiver depth
-       END DO  ! next range
-    END DO   ! next angle
+       END DO  ! next receiver range
+    END DO   ! next receiver angle
 
     RETURN
   END SUBROUTINE WriteArrivalsASCII3D
 
   ! **********************************************************************!
 
-  SUBROUTINE WriteArrivalsBinary3D( Ntheta, Nrd, Nr )
+  SUBROUTINE WriteArrivalsBinary3D( r, Ntheta, Nrd, Nr )
 
     ! Writes the arrival data (amplitude, delay for each eigenray)
     ! Binary output file
 
     INTEGER, INTENT( IN ) :: Ntheta, Nrd, Nr
+    REAL,    INTENT( IN ) :: r( Nr )
     INTEGER               :: itheta, ir, id, iArr
     
     WRITE( ARRFile ) MAXVAL( NArr3D( 1 : Ntheta,  1 : Nrd, 1 : Nr ) )
@@ -307,13 +314,20 @@ CONTAINS
     DO itheta = 1, Ntheta
        DO id = 1, Nrd
           DO ir = 1, Nr
+             IF ( Beam%RunType( 6 : 6 ) == '2' ) THEN   ! 2D run?
+                IF ( r ( ir ) == 0 ) THEN
+                   factor = 1e5                   ! avoid /0 at origin
+                ELSE
+                   factor = 1. / SQRT( r( ir ) )  ! cyl. spreading
+                END IF
+             END IF
 
              WRITE( ARRFile ) NArr3D( itheta,  id, ir )
 
              DO iArr = 1, NArr3D( itheta,  id, ir )
                 ! integers written out as reals below for fast reading in Matlab
                 WRITE( ARRFile ) &
-                              Arr3D( itheta, id, ir, iArr )%A,             &
+                     factor * Arr3D( itheta, id, ir, iArr )%A,             &
                SNGL( RadDeg * Arr3D( itheta, id, ir, iArr )%Phase ),       &
                               Arr3D( itheta, id, ir, iArr )%delay,         &
                               Arr3D( itheta, id, ir, iArr )%SrcDeclAngle,  &
@@ -324,8 +338,8 @@ CONTAINS
                         REAL( Arr3D( itheta, id, ir, iArr )%NBotBnc )
              END DO   ! next arrival
           END DO   ! next receiver depth
-       END DO   ! next range
-    END DO   ! next angle
+       END DO   ! next receiver range
+    END DO   ! next receiver angle
 
     RETURN
   END SUBROUTINE WriteArrivalsBinary3D

@@ -389,11 +389,11 @@ END SUBROUTINE EvaluateSSP2D
        WRITE( PRTFile, * ) 'Number of SSP ranges = ', SSP%Nr
 
        IF ( SSP%Nr < 2 ) THEN
-          CALL ERROUT( 'READIN: Quad', 'You must have a least two profiles in your 2D SSP field'  )
+          CALL ERROUT( 'sspMod: Quad', 'You must have a least two profiles in your 2D SSP field'  )
        END IF
 
        ALLOCATE( SSP%cMat( SSP%NPts, SSP%Nr ), SSP%czMat( SSP%NPts - 1, SSP%Nr ), SSP%Seg%r( SSP%Nr ), STAT = AllocateStatus )
-       IF ( AllocateStatus /= 0 ) CALL ERROUT( 'READIN: Quad', 'Insufficient memory to store SSP'  )
+       IF ( AllocateStatus /= 0 ) CALL ERROUT( 'sspMod: Quad', 'Insufficient memory to store SSP'  )
 
        READ( SSPFile,  * ) SSP%Seg%r( 1 : SSP%Nr )
        WRITE( PRTFile, * )
@@ -435,7 +435,7 @@ END SUBROUTINE EvaluateSSP2D
        IF ( x( 1 ) < SSP%Seg%r( 1 ) .OR. x( 1 ) > SSP%Seg%r( SSP%Nr ) ) THEN ! .OR. &
           WRITE( PRTFile, * ) 'ray is outside the box where the ocean soundspeed is defined'
           WRITE( PRTFile, * ) ' x = ( r, z ) = ', x
-          CALL ERROUT( 'Quad', 'ray is outside the box where the soundspeed is defined' )
+          CALL ERROUT( 'sspMod: Quad', 'ray is outside the box where the soundspeed is defined' )
        END IF
 
        CALL UpdateRangeSegmentT( x, t )
@@ -515,7 +515,7 @@ END SUBROUTINE EvaluateSSP2D
        WRITE( PRTFile, * )
        WRITE( PRTFile, * ) 'Number of points in x = ', SSP%Nx
        ALLOCATE( SSP%Seg%x( SSP%Nx ), STAT = AllocateStatus )
-       IF ( AllocateStatus /= 0 ) CALL ERROUT( 'READIN: Hexahedral', 'Insufficient memory to store SSP'  )
+       IF ( AllocateStatus /= 0 ) CALL ERROUT( 'sspMod: Hexahedral', 'Insufficient memory to store SSP'  )
        READ( SSPFile,  * ) SSP%Seg%x
        !WRITE( PRTFile, * )
        !WRITE( PRTFile, * ) 'x-coordinates of SSP (km):'
@@ -526,7 +526,7 @@ END SUBROUTINE EvaluateSSP2D
        WRITE( PRTFile, * )
        WRITE( PRTFile, * ) 'Number of points in y = ', SSP%Ny
        ALLOCATE( SSP%Seg%y( SSP%Ny ), STAT = AllocateStatus )
-       IF ( AllocateStatus /= 0 ) CALL ERROUT( 'READIN: Hexahedral', 'Insufficient memory to store SSP'  )
+       IF ( AllocateStatus /= 0 ) CALL ERROUT( 'sspMod: Hexahedral', 'Insufficient memory to store SSP'  )
        READ( SSPFile,  * ) SSP%Seg%y
        !WRITE( PRTFile, * )
        !WRITE( PRTFile, * ) 'y-coordinates of SSP (km):'
@@ -537,7 +537,7 @@ END SUBROUTINE EvaluateSSP2D
        WRITE( PRTFile, * )
        WRITE( PRTFile, * ) 'Number of points in z = ', SSP%Nz
        ALLOCATE( SSP%Seg%z( SSP%Nz ), STAT = AllocateStatus )
-       IF ( AllocateStatus /= 0 ) CALL ERROUT( 'READIN: Hexahedral', 'Insufficient memory to store SSP'  )
+       IF ( AllocateStatus /= 0 ) CALL ERROUT( 'sspMod: Hexahedral', 'Insufficient memory to store SSP'  )
        READ( SSPFile,  * ) SSP%Seg%z
        !WRITE( PRTFile, * )
        !WRITE( PRTFile, * ) 'z-coordinates of SSP (km):'
@@ -545,18 +545,18 @@ END SUBROUTINE EvaluateSSP2D
 
        ! SSP matrix should be bigger than 2x2x2
        IF ( SSP%Nx < 2 .OR. SSP%Ny < 2 .OR. SSP%Nz < 2 ) THEN
-          CALL ERROUT( 'READIN: Hexahedral', &
+          CALL ERROUT( 'sspMod: Hexahedral', &
                'You must have at least two points in x, y, z directions in your 3D SSP field'  )
        END IF
        
        IF ( SSP%Nz .GE. MaxSSP ) THEN
           ! LP: SSP%Nz / SSP%Seg%z will get assigned to SSP%NPts / SSP%z.
-          CALL ERROUT( 'READIN: Hexahedral', &
+          CALL ERROUT( 'sspMod: Hexahedral', &
                'Number of SSP points in Z exceeds limit' )
        END IF
 
        ALLOCATE( SSP%cMat3( SSP%Nx, SSP%Ny, SSP%Nz ), SSP%czMat3( SSP%Nx, SSP%Ny, SSP%Nz - 1 ), STAT = AllocateStatus )
-       IF ( AllocateStatus /= 0 ) CALL ERROUT( 'READIN: Hexahedral', 'Insufficient memory to store SSP'  )
+       IF ( AllocateStatus /= 0 ) CALL ERROUT( 'sspMod: Hexahedral', 'Insufficient memory to store SSP'  )
 
        WRITE( PRTFile, * )
        ! WRITE( PRTFile, * ) 'Sound speed matrix:'
@@ -800,7 +800,9 @@ END SUBROUTINE Analytic3D
 
     WRITE( PRTFile, * )
     WRITE( PRTFile, * ) 'Sound speed profile:'
-    WRITE( PRTFile, "( '   z (m)     alphaR (m/s)   betaR  rho (g/cm^3)  alphaI     betaI', / )" )
+    
+    WRITE( PRTFile, "( '      z         alphaR      betaR     rho        alphaI     betaI'    )" )
+    WRITE( PRTFile, "( '     (m)         (m/s)      (m/s)   (g/cm^3)      (m/s)     (m/s)', / )" )
        
     SSP%NPts = 1
 

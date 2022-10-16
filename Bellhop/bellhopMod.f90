@@ -6,8 +6,9 @@ MODULE bellhopMod
   ! Reduce MaxN (= max # of steps along a ray) to reduce storage
   ! Note space is wasted in NumTopBnc, NumBotBnc ...
 
+  LOGICAL            :: ThreeD   ! flag to indicate BELLHOP vs BELLHOP3D run
   INTEGER            :: Nrz_per_range, iStep
-  REAL    ( KIND= 8) :: freq, omega, SrcDeclAngle, SrcAzimAngle
+  REAL    ( KIND= 8) :: freq, omega, SrcDeclAngle, SrcAzimAngle, xs_3D( 3 )
   CHARACTER (LEN=80) :: Title
 
   ! *** Beam structure ***
