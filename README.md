@@ -137,23 +137,24 @@ So this was changed to `RayNormal`.
 
 ### Uninitialized variables in `PickEpsilon`
 
-Multiple codepaths do not set output values in `PickEpsilon`, leading to
-undefined behavior. For 2D, `HalfWidth` and `epsilonOpt` are unset for:
-- "Double" Cerveny style beams (`BeamType( 2 : 2 ) == 'C'`, in addition to
+Codepaths for several possible settings do not set output values in
+`PickEpsilon`, leading to undefined behavior if environment files use these
+settings. For 2D, `HalfWidth` and `epsilonOpt` are unset for:
+- Cerveny beam-width Cerveny beams (`BeamType( 2 : 2 ) == 'C'`, in addition to
   `BeamType( 1 : 1 )` being `'C'` or `'R'` for Cerveny beams)
-- Geometric hat beams specified as `'^'` instead of `'G'`
+- Geometric hat beams specified as `'^'` (or now in 2022, `' '`) instead of `'G'`
 
 For 3D / Nx2D, `epsilonOpt` is unset for:
-- double Cerveny beams
+- Cerveny beam-width Cerveny beams
 - WKB beams
 
 For both 2D and 3D, beams not following any of the beam types or beam width
 types are also unset, though this leads to other errors as well.
 
 These issues went undetected because the results of `PickEpsilon` are actually
-only used in conjunction with Cerveny beams, and the Cerveny 3D influence
-function `Influence3D` was removed from `BELLHOP3D` before the earliest version
-we have.
+only used in conjunction with Cerveny beams, the Cerveny 3D influence function
+`Influence3D` was removed from `BELLHOP3D` before the earliest version we have,
+and none of the 2D environment files use the Cerveny beam-width Cerveny beams.
 
 ### New in 2022: Nx2D Beam Box uninitialized value
 

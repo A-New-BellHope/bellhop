@@ -393,7 +393,7 @@ CONTAINS
     END IF
 
     ! LP: removed 1000 * epsilon which mbp had comment questioning also
-    IF ( ABS( urayt( 2 ) ) > EPSILON( h1 ) ) THEN
+    IF ( ABS( urayt( 2 ) ) > EPSILON( hySeg ) ) THEN
        IF          ( x(  2 ) < ySeg( 1 ) ) THEN
           hySeg = -( x0( 2 ) - ySeg( 1 ) ) / urayt( 2 )
           IF ( STEP_DEBUGGING ) &

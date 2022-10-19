@@ -204,7 +204,7 @@ CONTAINS
     END IF
 
     hSeg = huge( hSeg )
-    IF ( ABS( urayt( 1 ) )  > EPSILON( h4 ) ) THEN
+    IF ( ABS( urayt( 1 ) )  > EPSILON( hSeg ) ) THEN
        IF         ( x(  1 ) < rSeg( 1 ) ) THEN
           hSeg = -( x0( 1 ) - rSeg( 1 ) ) / urayt( 1 )
        ELSE IF    ( x(  1 ) > rSeg( 2 ) ) THEN
@@ -258,12 +258,12 @@ CONTAINS
     END IF
     
     ! ray mask using a box centered at ( 0, 0 )
-    IF ( ABS( x( 1 ) ) > Beam%Box%r ) THEN
+    IF ( ABS( x2( 1 ) ) > Beam%Box%r ) THEN
        h = ( Beam%Box%r - ABS( x0( 1 ) ) ) / ABS( urayt( 1 ) )
        x2( 2 ) = x0( 2 ) + h * urayt( 2 )
        x2( 1 ) = SIGN( Beam%Box%r, x0( 1 ) )
     END IF
-    IF ( ABS( x( 2 ) ) > Beam%Box%z ) THEN
+    IF ( ABS( x2( 2 ) ) > Beam%Box%z ) THEN
        h = ( Beam%Box%z - ABS( x0( 2 ) ) ) / ABS( urayt( 2 ) )
        x2( 1 ) = x0( 1 ) + h * urayt( 1 )
        x2( 2 ) = SIGN( Beam%Box%z, x0( 2 ) )

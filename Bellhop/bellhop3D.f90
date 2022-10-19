@@ -610,8 +610,8 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
 
      ELSE IF ( DistBegBot > 0.0d0 .AND. DistEndBot <= 0.0d0 ) THEN  ! test bottom reflection
         ! write( *, * ) 'Reflecting', x, Botx
-+       ! write( *, * ) 'Botn', Botn
-+       ! write( *, * ) 'Distances', DistEndTop, DistEndBot
+        ! write( *, * ) 'Botn', Botn
+        ! write( *, * ) 'Distances', DistEndTop, DistEndBot
         IF ( btyType == 'C' ) THEN
 
            x = [ xs_3D( 1 ) + ray2D( is + 1 )%x( 1 ) * tradial( 1 ),   &
@@ -733,8 +733,8 @@ SUBROUTINE Step2D( ray0, ray2, tradial )
   h = Beam%deltas            ! initially set the step h, to the basic one, deltas
 
   urayt0 = c0 * ray0%t  ! unit tangent
-  rayx3D = [ xs_3D( 1 ) + ray0%x( 1 ) * tradial( 1 ), xs( 2 ) + ray0%x( 1 ) * tradial( 2 ), ray0%x( 2 ) ]
-  rayt3D = [              urayt0( 1 ) * tradial( 1 ),           urayt0( 1 ) * tradial( 2 ), urayt0( 2 ) ]
+  rayx3D = [ xs_3D( 1 ) + ray0%x( 1 ) * tradial( 1 ), xs_3D( 2 ) + ray0%x( 1 ) * tradial( 2 ), ray0%x( 2 ) ]
+  rayt3D = [              urayt0( 1 ) * tradial( 1 ),              urayt0( 1 ) * tradial( 2 ), urayt0( 2 ) ]
 
   CALL ReduceStep3D( rayx3D, rayt3D, iSegx0, iSegy0, iSegz0, h ) ! reduce h to land on boundary
 
