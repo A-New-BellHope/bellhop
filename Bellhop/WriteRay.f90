@@ -48,19 +48,18 @@ CONTAINS
 
   ! **********************************************************************!
 
-  SUBROUTINE WriteRay3D( alpha0, beta0, Nsteps1, xs )
+  SUBROUTINE WriteRay3D( alpha0, beta0, Nsteps1 )
 
     ! The 3D version is for ray traces in (x,y,z) coordinates
 
     INTEGER,       INTENT( IN ) :: Nsteps1
     REAL (KIND=8), INTENT( IN ) :: alpha0, beta0   ! take-off angle of this ray
-    REAL (KIND=8), INTENT( IN ) :: xs( 3 )         ! source location
 
     ! if Nx2D run, copy r-z rays to x-y-z rays
 
     IF ( Beam%RunType( 6 : 6 ) == '2' ) THEN
-       ray3D%x( 1 )    = xs( 1 ) + ray2D%x( 1 ) * COS( beta0 )
-       ray3D%x( 2 )    = xs( 2 ) + ray2D%x( 1 ) * SIN( beta0 )
+       ray3D%x( 1 )    = xs_3D( 1 ) + ray2D%x( 1 ) * COS( beta0 )
+       ray3D%x( 2 )    = xs_3D( 2 ) + ray2D%x( 1 ) * SIN( beta0 )
        ray3D%x( 3 )    = ray2D%x( 2 )
        ray3D%NumTopBnc = ray2D%NumTopBnc
        ray3D%NumBotBnc = ray2D%NumBotBnc
@@ -93,4 +92,3 @@ CONTAINS
   END SUBROUTINE WriteRay3D
 
 END MODULE WriteRay
-

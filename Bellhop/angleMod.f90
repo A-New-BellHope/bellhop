@@ -66,9 +66,9 @@ CONTAINS
 
     WRITE( PRTFile, * ) '__________________________________________________________________________'
     WRITE( PRTFile, * )
-    WRITE( PRTFile, * ) 'Number of beams in elevation   = ', Angles%Nalpha
+    WRITE( PRTFile, * ) '   Number of beams in elevation   = ', Angles%Nalpha
     IF ( Angles%iSingle_alpha > 0 ) WRITE( PRTFile, * ) 'Trace only beam number ', Angles%iSingle_alpha
-    WRITE( PRTFile, * ) 'Beam take-off angles (degrees)'
+    WRITE( PRTFile, * ) '   Beam take-off angles (degrees)'
 
     IF ( Angles%Nalpha >= 1 ) WRITE( PRTFile, "( 5G14.6 )" ) Angles%alpha( 1 : MIN( Angles%Nalpha, Number_to_Echo ) )
     IF ( Angles%Nalpha > Number_to_Echo ) WRITE( PRTFile,  "( G14.6 )" ) ' ... ', Angles%alpha( Angles%Nalpha )
@@ -130,9 +130,9 @@ CONTAINS
     END IF
 
     WRITE( PRTFile, * )
-    WRITE( PRTFile, * ) 'Number of beams in bearing   = ', Angles%Nbeta
+    WRITE( PRTFile, * ) '   Number of beams in bearing   = ', Angles%Nbeta
     IF ( Angles%iSingle_beta > 0 ) WRITE( PRTFile, * ) 'Trace only beam number ', Angles%iSingle_beta
-    WRITE( PRTFile, * ) 'Beam take-off angles (degrees)'
+    WRITE( PRTFile, * ) '   Beam take-off angles (degrees)'
 
     IF ( Angles%Nbeta >= 1 ) WRITE( PRTFile, "( 5G14.6 )" ) Angles%beta( 1 : MIN( Angles%Nbeta, Number_to_Echo ) )
     IF ( Angles%Nbeta > Number_to_Echo ) WRITE( PRTFile, "( G14.6 )" ) ' ... ', Angles%beta( Angles%Nbeta )

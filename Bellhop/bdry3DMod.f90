@@ -10,8 +10,8 @@ MODULE bdry3Dmod
   ! n1, n2 are normals for each of the triangles in a pair, n is selected from those
   ! Len = length of tangent (temporary variable to normalize tangent)
 
-  USE SubTabulate
   USE monotonicMod
+  USE SubTabulate
   USE FatalError
 
   IMPLICIT NONE
@@ -21,8 +21,8 @@ MODULE bdry3Dmod
        NATIPts( 2 ), NBTYPts( 2 )
   INTEGER            :: ix, iy, IOStat, IAllocStat, iSmallStepCtr = 0
   REAL (KIND=8) :: xTopseg( 2 ), yTopseg( 2 ), xBotseg( 2 ), yBotseg( 2 ), &
-       Topx( 3 ), Botx( 3 ), &   ! coordinates of corner of active rectangle
-       Topn( 3 ), Botn( 3 ), &   ! tangent and normal    of active triangle
+       Topx( 3 ), Botx( 3 ), &    ! coordinates of corner of active rectangle
+       Topn( 3 ), Botn( 3 ), &    ! tangent and normal    of active triangle
        Topxmid( 3 ), Botxmid( 3 ) ! coordinates of center of active rectangle
        ! because corners may be at big number and mess up floating point precision
   LOGICAL            :: Top_tridiag_pos, Bot_tridiag_pos ! whether in positive / n2 triangle
@@ -52,7 +52,8 @@ CONTAINS
 
     SELECT CASE ( TopATI )
     CASE ( '~', '*' )
-       WRITE( PRTFile, * ) '*********************************'
+       WRITE( PRTFile, * ) '__________________________________________________________________________'
+       WRITE( PRTFile, * )
        WRITE( PRTFile, * ) 'Using top-altimetry file'
 
        OPEN( UNIT = ATIFile, FILE = TRIM( FileRoot ) // '.ati', STATUS = 'OLD', IOSTAT = IOStat, ACTION = 'READ' )
@@ -74,7 +75,7 @@ CONTAINS
        ! x values
        READ(  ATIFile, * ) NatiPts( 1 )
        WRITE( PRTFile, * )
-       WRITE( PRTFile, * ) 'Number of altimetry points in x-direction', NatiPts( 1 )
+       WRITE( PRTFile, * ) 'Number of altimetry points in x', NatiPts( 1 )
 
        ALLOCATE( TopGlobalx( MAX( NatiPts( 1 ), 3 ) ), Stat = IAllocStat )
        IF ( IAllocStat /= 0 ) &
@@ -86,13 +87,13 @@ CONTAINS
        WRITE( PRTFile, "( 5G14.6 )" ) ( TopGlobalx( ix ), ix = 1, MIN( NatiPts( 1 ), Number_to_Echo ) )
        IF ( NatiPts( 1 ) > Number_to_Echo ) WRITE( PRTFile, "( G14.6 )" ) ' ... ', TopGlobalx( NatiPts( 1 ) )
        IF ( .NOT. monotonic( TopGlobalx, NatiPts( 1 ) ) ) THEN
-          CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Altimetry X values are not monotonically increasing' )
+          CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Altimetry x-coordinates are not monotonically increasing' )
        END IF
 
        ! y values
        READ(  ATIFile, * ) NatiPts( 2 )
        WRITE( PRTFile, * )
-       WRITE( PRTFile, * ) 'Number of altimetry points in y-direction', NatiPts( 2 )
+       WRITE( PRTFile, * ) 'Number of altimetry points in y', NatiPts( 2 )
 
        ALLOCATE( TopGlobaly( MAX( NatiPts( 2 ), 3 ) ), Stat = IAllocStat )
        IF ( IAllocStat /= 0 ) &
@@ -104,7 +105,7 @@ CONTAINS
        WRITE( PRTFile, "( 5G14.6 )" ) ( TopGlobaly( iy ), iy = 1, MIN( NatiPts( 2 ), Number_to_Echo ) )
        IF ( NatiPts( 2 ) > Number_to_Echo ) WRITE( PRTFile, "( G14.6 )"  ) ' ... ', TopGlobaly( NatiPts( 2 ) )
        IF ( .NOT. monotonic( TopGlobaly, NatiPts( 2 ) ) ) THEN
-          CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Altimetry Y values are not monotonically increasing' )
+          CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Altimetry y-coordinates are not monotonically increasing' )
        END IF
 
        TopGlobalx = 1000. * TopGlobalx   ! convert km to m
@@ -192,7 +193,8 @@ CONTAINS
  
     SELECT CASE ( BotBTY )
     CASE ( '~', '*' )
-       WRITE( PRTFile, * ) '*********************************'
+       WRITE( PRTFile, * ) '__________________________________________________________________________'
+       WRITE( PRTFile, * )
        WRITE( PRTFile, * ) 'Using bottom-bathymetry file'
 
        OPEN( UNIT = BTYFile, FILE = TRIM( FileRoot ) // '.bty', STATUS = 'OLD', IOSTAT = IOStat, ACTION = 'READ' )
@@ -215,7 +217,7 @@ CONTAINS
        ! x values
        READ(  BTYFile, * ) NbtyPts( 1 )
        WRITE( PRTFile, * )
-       WRITE( PRTFile, * ) 'Number of bathymetry points in x-direction', NbtyPts( 1 )
+       WRITE( PRTFile, * ) 'Number of bathymetry points in x', NbtyPts( 1 )
 
        ALLOCATE( BotGlobalx( MAX( NbtyPts( 1 ), 3 ) ), Stat = IAllocStat )
        IF ( IAllocStat /= 0 ) &
@@ -227,13 +229,13 @@ CONTAINS
        WRITE( PRTFile, "( 5G14.6 )" ) ( BotGlobalx( ix ), ix = 1, MIN( NbtyPts( 1 ), Number_to_Echo ) )
        IF ( NbtyPts( 1 ) > Number_to_Echo ) WRITE( PRTFile, "( G14.6 )" ) ' ... ', BotGlobalx( NbtyPts( 1 ) )
        IF ( .NOT. monotonic( BotGlobalx, NbtyPts( 1 ) ) ) THEN
-          CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Bathymetry X values are not monotonically increasing' )
+          CALL ERROUT( 'BELLHOP3D:ReadBTY3D', 'Bathymetry X values are not monotonically increasing' )
        END IF
 
        ! y values
        READ(  BTYFile, * ) NbtyPts( 2 )
        WRITE( PRTFile, * )
-       WRITE( PRTFile, * ) 'Number of bathymetry points in y-direction', NbtyPts( 2 )
+       WRITE( PRTFile, * ) 'Number of bathymetry points in y', NbtyPts( 2 )
 
        ALLOCATE( BotGlobaly( MAX( NbtyPts( 2 ), 3 ) ), Stat = IAllocStat )
        IF ( IAllocStat /= 0 ) &
@@ -245,7 +247,7 @@ CONTAINS
        WRITE( PRTFile, "( 5G14.6 )" ) ( BotGlobaly( iy ), iy = 1, MIN( NbtyPts( 2 ), Number_to_Echo ) )
        IF ( NbtyPts( 2 ) > Number_to_Echo ) WRITE( PRTFile, "( G14.6 )" ) ' ... ', BotGlobaly( NbtyPts( 2 ) )
        IF ( .NOT. monotonic( BotGlobaly, NbtyPts( 2 ) ) ) THEN
-          CALL ERROUT( 'BELLHOP3D:ReadATI3D', 'Bathymetry Y values are not monotonically increasing' )
+          CALL ERROUT( 'BELLHOP3D:ReadBTY3D', 'Bathymetry Y values are not monotonically increasing' )
        END IF
 
        BotGlobalx = 1000. * BotGlobalx   ! convert km to m
@@ -289,7 +291,7 @@ CONTAINS
        btyType = 'R'
        NbtyPts = [ 2, 2 ]
        ALLOCATE( Bot( 2, 2 ), Stat = IAllocStat )
-       IF ( IAllocStat /= 0 ) CALL ERROUT( 'BELLHOP', 'Insufficient memory'  )
+       IF ( IAllocStat /= 0 ) CALL ERROUT( 'BELLHOP3D:ReadBTY3D', 'Insufficient memory'  )
 
        Bot( 1, 1 )%x = [ -big, -big, DepthB ]
        Bot( 1, 2 )%x = [ -big,  big, DepthB ]

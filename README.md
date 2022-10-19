@@ -181,14 +181,6 @@ In `Reflect2D` (Nx2D only version), for `Beam%Type( 4 : 4 ) == 'S'` by "Seongil"
 the check for `si == 0` preventing a divide-by-zero is missing compared to the
 2D version. It has been readded.
 
-### Missing monotonicity checks
-
-The original search algorithms, as well as the new step-to-edge-case-aware
-algorithms, both require that input data arrays are monotonically increasing in
-relevant dimensions, and will produce incorrect results if this is violated.
-BELLHOP did not check for this in altimetry X and Y, and bathymetry X and Y,
-but this has been added.
-
 ### 3D SSP Hexahedral size overflow check
 
 In 3D SSP Hexahedral, `SSP%Nz` is assigned to `SSP%NPts` and `SSP%Seg%z` to

@@ -645,7 +645,11 @@ CONTAINS
     
     SELECT CASE( Beam%RunType( 1 : 1 ) )
     CASE ( 'E' )                ! eigenrays
-       CALL WriteRay2D( SrcDeclAngle, iS )
+       IF ( Title( 1 :  9 ) == 'BELLHOP- ' ) THEN   ! BELLHOP run
+          CALL WriteRay2D( SrcDeclAngle, iS )
+       ELSE                                         ! BELLHOP3D run
+          CALL WriteRay3D( DegRad * SrcDeclAngle, DegRad * SrcAzimAngle, is )   ! produces no output if NR=1
+       END IF
     CASE ( 'A', 'a' )           ! arrivals
        CALL AddArr( omega, iz, ir, Amp, phaseInt, delay, SrcDeclAngle, RcvrDeclAngle, ray2D( iS )%NumTopBnc, ray2D( iS )%NumBotBnc )
     CASE ( 'C' )                ! coherent TL

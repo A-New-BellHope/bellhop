@@ -9,28 +9,28 @@ MODULE bdrymod
   IMPLICIT NONE
   SAVE
   INTEGER, PARAMETER :: ATIFile = 40, BTYFile = 41, Number_to_Echo = 21
-  INTEGER            :: IsegTop, IsegBot            ! indices that point to the current active segment
+  INTEGER            :: IsegTop, IsegBot                ! indices that point to the current active segment
   INTEGER, PROTECTED :: NATIPts = 2, NBTYPts = 2
   INTEGER            :: ii, IOStat, IAllocStat, iSmallStepCtr = 0
 
-  REAL (KIND=8)      :: rTopseg( 2 ), rBotseg( 2 )  ! range intervals defining the current active segment
+  REAL (KIND=8)      :: rTopseg( 2 ), rBotseg( 2 )      ! range intervals defining the current active segment
   CHARACTER  (LEN=2) :: atiType= 'LS', btyType = 'LS'
 
   ! Halfspace properties
   TYPE HSInfo2
      REAL     (KIND=8) :: alphaR, alphaI, betaR, betaI  ! compressional and shear wave speeds/attenuations in user units
-     COMPLEX  (KIND=8) :: cP, cS                 ! P-wave, S-wave speeds
-     REAL     (KIND=8) :: rho, Depth             ! density, depth
-     CHARACTER (LEN=1) :: BC                     ! Boundary condition type
+     COMPLEX  (KIND=8) :: cP, cS                        ! P-wave, S-wave speeds
+     REAL     (KIND=8) :: rho, Depth                    ! density, depth
+     CHARACTER (LEN=1) :: BC                            ! Boundary condition type
      CHARACTER (LEN=6) :: Opt
   END TYPE
 
   TYPE BdryPt
-     REAL    (KIND=8) :: x( 2 ), t( 2 ), n( 2 )        ! coordinate, tangent, and outward normal for a segment
-     REAL    (KIND=8) :: Nodet( 2 ), Noden( 2 )        ! tangent and normal at the node, if the curvilinear option is used
-     REAL    (KIND=8) :: Len, Kappa                    ! length and curvature of a segment
-     REAL    (KIND=8) :: Dx, Dxx, Dss                  ! first, second derivatives wrt depth; s is along tangent
-     TYPE( HSInfo2 )   :: HS
+     REAL    (KIND=8) :: x( 2 ), t( 2 ), n( 2 )         ! coordinate, tangent, and outward normal for a segment
+     REAL    (KIND=8) :: Nodet( 2 ), Noden( 2 )         ! tangent and normal at the node, if the curvilinear option is used
+     REAL    (KIND=8) :: Len, Kappa                     ! length and curvature of a segment
+     REAL    (KIND=8) :: Dx, Dxx, Dss                   ! first, second derivatives wrt depth; s is along tangent
+     TYPE( HSInfo2 )  :: HS
   END TYPE
 
   TYPE(BdryPt), ALLOCATABLE :: Top( : ), Bot( : )
@@ -161,7 +161,6 @@ CONTAINS
           CALL ERROUT( 'ReadBTY', 'Unknown option for selecting bathymetry interpolation' )
        END SELECT BathyType
 
-
        READ(  BTYFile, * ) NbtyPts
        WRITE( PRTFile, * ) 'Number of bathymetry points = ', NbtyPts
 
@@ -198,8 +197,8 @@ CONTAINS
              ! LP: Same change as above
              IF ( ii < Number_to_Echo .OR. ii == NbtyPts - 1 ) THEN   ! echo some values
                 WRITE( PRTFile, FMT="( F10.2, F10.2, 3X, 2F10.2, 3X, F6.2, 3X, 2F10.4 )" ) &
-                   Bot( ii )%x, Bot( ii )%HS%alphaR, Bot( ii )%HS%betaR, Bot( ii )%HS%rho, &
-                                Bot( ii )%HS%alphaI, Bot( ii )%HS%betaI
+                                                   Bot( ii )%x, Bot( ii )%HS%alphaR, Bot( ii )%HS%betaR, Bot( ii )%HS%rho, &
+                                                                Bot( ii )%HS%alphaI, Bot( ii )%HS%betaI
              END IF
           CASE DEFAULT
              CALL ERROUT( 'ReadBTY', 'Unknown option for selecting bathymetry option' )

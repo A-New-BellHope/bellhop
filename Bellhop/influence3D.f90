@@ -24,12 +24,11 @@ MODULE Influence3D
        INFL_DEBUGGING_IZ = 0
 
 CONTAINS
-  SUBROUTINE Influence3DGeoHatRayCen( xs, alpha, beta, Dalpha, Dbeta, P )
+  SUBROUTINE Influence3DGeoHatRayCen( alpha, beta, Dalpha, Dbeta, P )
 
     ! Geometrically-spreading beams with a hat-shaped beam in ray-centered coordinates
 
     REAL ( KIND=8 ), INTENT( IN  ) :: alpha, beta, Dalpha, Dbeta         ! ray take-off angle
-    REAL ( KIND=8 ), INTENT( IN  ) :: xs( 3 )                            ! source coordinate
     COMPLEX        , INTENT( OUT ) :: P( Pos%Ntheta, Pos%Nrz, Pos%NRr )  ! complex pressure
     INTEGER          :: irA, irB, II
     REAL    (KIND=8) :: nA, nB, mA, mB, deltaA, deltaB, t_rcvr( 2, Pos%Ntheta ), &
@@ -50,7 +49,7 @@ CONTAINS
 
     ! pre-calculate tangents, normals (e1, e2), etc.
     DO is = 1, Beam%Nsteps
-       xt( :, is ) = ray3D( is )%x - xs   ! vector from the origin of the receiver plane to this point on the ray
+       xt( :, is ) = ray3D( is )%x - xs_3D   ! vector from the origin of the receiver plane to this point on the ray
        CALL RayNormal( ray3D( is )%t, ray3D( is )%phi, ray3D( is )%c, e1G( :, is ), e2G( :, is ) )
 
        ! e1xe2( :, is ) = cross_product( e1G( :, is ), e2G( :, is ) )
@@ -133,7 +132,7 @@ CONTAINS
                    IF ( DetQint <= 0.0d0 .AND. ray3D( is - 1 )%DetQ > 0.0d0 .OR. &
                         DetQint >= 0.0d0 .AND. ray3D( is - 1 )%DetQ < 0.0d0 ) phaseInt = phaseInt + pi / 2.
 
-                   CALL ApplyContribution( alpha, beta, xs, P( itheta, iz, ir ) )
+                   CALL ApplyContribution( alpha, beta, P( itheta, iz, ir ) )
                 END DO Ranges
              END IF
              ! LP: These values are overwritten on the next loop; this does nothing.
@@ -147,12 +146,11 @@ CONTAINS
 
   !**********************************************************************!
 
-  SUBROUTINE Influence3DGeoHatCart( xs, alpha, beta, Dalpha, Dbeta, P, x_rcvrMat, t_rcvr )
+  SUBROUTINE Influence3DGeoHatCart( alpha, beta, Dalpha, Dbeta, P, x_rcvrMat, t_rcvr )
 
     ! Geometrically-spreading beams with a hat-shaped beam
 
     REAL ( KIND=8 ), INTENT( IN  ) :: alpha, beta, Dalpha, Dbeta         ! ray take-off angle
-    REAL ( KIND=8 ), INTENT( IN  ) :: xs( 3 )                            ! source coordinate
     REAL ( KIND=8 ), INTENT( IN  ) :: x_rcvrMat( 2, Pos%Ntheta, Pos%NRr ), t_rcvr( 2, Pos%Ntheta ) ! rcvr coordinates and tangent
     COMPLEX        , INTENT( OUT ) :: P( Pos%Ntheta, Pos%Nrz, Pos%NRr )  ! complex pressure
     INTEGER            :: irT( 1 ), irTT
@@ -168,13 +166,13 @@ CONTAINS
 
     ! Compute nearest rcvr before normal
     ! LP: Silly / partly dead code, see README.
-    rA  = NORM2( ray3D( 1 )%x( 1 : 2 ) - xs( 1 : 2 ) )         ! range of ray point
+    rA  = NORM2( ray3D( 1 )%x( 1 : 2 ) - xs_3D( 1 : 2 ) )         ! range of ray point
     irT = MINLOC( Pos%Rr( 1 : Pos%NRr ), MASK = Pos%Rr( 1 : Pos%NRr ) .GT. rA )        ! index of receiver
     ir  = irT( 1 )
 
     Stepping: DO is = 2, Beam%Nsteps
        ! Compute nearest rcvr before normal
-       rB  = NORM2( ray3D( is )%x( 1 : 2 ) - xs( 1 : 2 ) )         ! range of ray point
+       rB  = NORM2( ray3D( is )%x( 1 : 2 ) - xs_3D( 1 : 2 ) )         ! range of ray point
 
        IF ( ABS( rB - rA ) > 1.0D3 * SPACING( rA ) ) THEN   ! jump to next step if duplicate point
           ! initialize the index of the receiver range
@@ -235,8 +233,8 @@ CONTAINS
                       ! We do not want to accept these contributions--- they have the proper range but are 180 degrees
                       ! away from this segment of the ray
                       ! s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - x_ray( 1 : 2 ), rayt( 1 : 2 ) / NORM2( rayt( 1 : 2 ) ) )   ! a distance along ray    (in x-y plane)
-                      ! s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - xs( 1 : 2 ), t_rcvr( 1 : 2, itheta ) ) ! a distance along radial (in x-y plane)
-                      s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - xs( 1 : 2 ), x_ray( 1 : 2 ) - xs( 1 : 2 ) ) ! vector to rcvr dotted into vector to ray point
+                      ! s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - xs_3D( 1 : 2 ), t_rcvr( 1 : 2, itheta ) ) ! a distance along radial (in x-y plane)
+                      s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - xs_3D( 1 : 2 ), x_ray( 1 : 2 ) - xs_3D( 1 : 2 ) ) ! vector to rcvr dotted into vector to ray point
 
                       ! The real receivers have an s-value in [0, R_len]
                       ! IF ( s < 0D0 .OR. s > NORM2( ray3D( is )%x( 1 : 2 ) - ray3D( is - 1 )%x( 1 : 2 ) ) ) THEN
@@ -308,7 +306,7 @@ CONTAINS
                          W     = ( 1 - a ) * ( 1 - b )   ! hat function: 1 on center, 0 on edge
                          Amp   = const * W
 
-                         CALL ApplyContribution( alpha, beta, xs, P( itheta, iz, ir ) )
+                         CALL ApplyContribution( alpha, beta, P( itheta, iz, ir ) )
                       END DO ReceiverDepths
                    END DO Radials
 
@@ -334,13 +332,12 @@ CONTAINS
 
   !**********************************************************************!
 
-  SUBROUTINE Influence3DGeoGaussianRayCen( xs, alpha, beta, Dalpha, Dbeta, P )
+  SUBROUTINE Influence3DGeoGaussianRayCen( alpha, beta, Dalpha, Dbeta, P )
 
     ! Geometrically-spreading beams with a hat-shaped beam in ray-centered coordinates
 
     REAL, PARAMETER                :: BeamWindow = 4.0                   ! kills beams outside e**(-0.5 * BeamWindow**2 )
     REAL ( KIND=8 ), INTENT( IN  ) :: alpha, beta, Dalpha, Dbeta         ! ray take-off angle
-    REAL ( KIND=8 ), INTENT( IN  ) :: xs( 3 )                            ! source coordinate
     COMPLEX        , INTENT( OUT ) :: P( Pos%Ntheta, Pos%Nrz, Pos%NRr )  ! complex pressure
     INTEGER          :: irA, irB, II
     REAL    (KIND=8) :: nA, nB, mA, mB, a, b, deltaA, deltaB, t_rcvr( 2, Pos%Ntheta ), &
@@ -362,7 +359,7 @@ CONTAINS
 
     ! pre-calculate tangents, normals (e1, e2), etc.
     DO is = 1, Beam%Nsteps
-       xt( :, is ) = ray3D( is )%x - xs   ! vector from the origin of the receiver plane to this point on the ray
+       xt( :, is ) = ray3D( is )%x - xs_3D   ! vector from the origin of the receiver plane to this point on the ray
        CALL RayNormal( ray3D( is )%t, ray3D( is )%phi, ray3D( is )%c, e1G( :, is ), e2G( :, is ) )
 
        ! e1xe2( :, is ) = cross_product( e1G( :, is ), e2G( :, is ) )
@@ -495,7 +492,7 @@ CONTAINS
                                is-2, itheta-1, iz-1, ir-1, const, W, delay, phaseInt
                          END IF
 
-                         CALL ApplyContribution( alpha, beta, xs, P( itheta, iz, ir ) )
+                         CALL ApplyContribution( alpha, beta, P( itheta, iz, ir ) )
 !!$                         ______________
 !!$
 !!$                         ! Within beam window?
@@ -546,13 +543,12 @@ CONTAINS
 
   !**********************************************************************!
 
-  SUBROUTINE Influence3DGeoGaussianCart( xs, alpha, beta, Dalpha, Dbeta, P, x_rcvrMat, t_rcvr )
+  SUBROUTINE Influence3DGeoGaussianCart( alpha, beta, Dalpha, Dbeta, P, x_rcvrMat, t_rcvr )
 
     ! Geometrically-spreading beams with a Gaussian-shaped beam
 
     REAL, PARAMETER                :: BeamWindow = 4.0                   ! kills beams outside e**(-0.5 * BeamWindow**2 )
     REAL ( KIND=8 ), INTENT( IN  ) :: alpha, beta, Dalpha, Dbeta         ! ray take-off angle
-    REAL ( KIND=8 ), INTENT( IN  ) :: xs( 3 )                            ! source coordinate
     REAL ( KIND=8 ), INTENT( IN  ) :: x_rcvrMat( 2, Pos%Ntheta, Pos%NRr ), t_rcvr( 2, Pos%Ntheta ) ! rcvr coordinates and tangent
     COMPLEX        , INTENT( OUT ) :: P( Pos%Ntheta, Pos%Nrz, Pos%NRr )  ! complex pressure
     INTEGER            :: irT( 1 ), irTT
@@ -569,14 +565,14 @@ CONTAINS
 
     ! Compute nearest rcvr before normal
     ! LP: Same issues as hat cart.
-    rA  = NORM2( ray3D( 1 )%x( 1 : 2 ) - xs( 1 : 2 ) )         ! range of ray point
+    rA  = NORM2( ray3D( 1 )%x( 1 : 2 ) - xs_3D( 1 : 2 ) )         ! range of ray point
     irT = MINLOC( Pos%Rr( 1 : Pos%NRr ), MASK = Pos%Rr( 1 : Pos%NRr ) .GT. rA )   ! index of receiver
     ir  = irT( 1 )
 
     Stepping: DO is = 2, Beam%Nsteps
        lambda = ray3D( is - 1 )%c / freq   ! local wavelength
        ! Compute nearest rcvr before normal
-       rB  = NORM2( ray3D( is )%x( 1 : 2 ) - xs( 1 : 2 ) )         ! range of ray point
+       rB  = NORM2( ray3D( is )%x( 1 : 2 ) - xs_3D( 1 : 2 ) )         ! range of ray point
 
        IF ( ABS( rB - rA ) > 1.0D3 * SPACING( rA ) ) THEN   ! jump to next step if duplicate point
           ! initialize the index of the receiver range
@@ -634,8 +630,8 @@ CONTAINS
                       ! away from this segment of the ray
 !!! pre-calculate unit ray tangent
                       ! s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - x_ray( 1 : 2 ), rayt( 1 : 2 ) / NORM2( rayt( 1 : 2 ) ) )   ! a distance along ray    (in x-y plane)
-                      ! s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - xs( 1 : 2 ), t_rcvr( 1 : 2, itheta ) ) ! a distance along radial (in x-y plane)
-                      s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - xs( 1 : 2 ), x_ray( 1 : 2 ) - xs( 1 : 2 ) ) ! vector to rcvr dotted into vector to ray point
+                      ! s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - xs_3D( 1 : 2 ), t_rcvr( 1 : 2, itheta ) ) ! a distance along radial (in x-y plane)
+                      s = DOT_PRODUCT( x_rcvr( 1 : 2 ) - xs_3D( 1 : 2 ), x_ray( 1 : 2 ) - xs_3D( 1 : 2 ) ) ! vector to rcvr dotted into vector to ray point
 
                       ! The real receivers have an s-value in [0, R_len]
                       ! IF ( s < 0D0 .OR. s > NORM2( ray3D( is )%x( 1 : 2 ) - ray3D( is - 1 )%x( 1 : 2 ) ) ) THEN
@@ -735,7 +731,7 @@ CONTAINS
                          !    WRITE( PRTFile, * ) 'iz const W delay phaseInt', iz, const, W, delay, phaseInt
                          ! END IF
 
-                         CALL ApplyContribution( alpha, beta, xs, P( itheta, iz, ir ) )
+                         CALL ApplyContribution( alpha, beta, P( itheta, iz, ir ) )
                       END DO ReceiverDepths
                    END DO Radials
 
@@ -781,15 +777,14 @@ CONTAINS
 
   ! **********************************************************************!
 
-  SUBROUTINE ApplyContribution( alpha, beta, xs, U )
+  SUBROUTINE ApplyContribution( alpha, beta, U )
 
     REAL ( KIND=8 ), INTENT( IN    ) :: alpha, beta         ! ray take-off angle
-    REAL ( KIND=8 ), INTENT( IN    ) :: xs( 3 )             ! source coordinate
     COMPLEX,         INTENT( INOUT ) :: U
 
     SELECT CASE( Beam%RunType( 1 : 1 ) )
     CASE ( 'E' )      ! eigenrays
-       CALL WriteRay3D( alpha, beta, is, xs )   ! produces no output if NR=1
+       CALL WriteRay3D( alpha, beta, is )   ! produces no output if NR=1
     CASE ( 'A', 'a' ) ! arrivals
        rayt = ray3D( is )%x - ray3D( is - 1 )%x ! ray tangent !!! does this always need to be done???
        RcvrDeclAngle = RadDeg * ATAN2( rayt( 3 ), NORM2( rayt( 1 : 2 ) ) )
