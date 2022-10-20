@@ -35,8 +35,8 @@ CONTAINS
        WRITE( PRTFile, * ) 'iSegr iSegz', iSegr, iSegz
     END IF
     
-    ! IF ( ray0%x( 2 ) > 1500.0 ) THEN
-    ! STOP 'Enough'
+    ! IF ( ray0%x( 1 ) > 10.0 ) THEN
+    !    STOP 'Enough'
     ! END IF
 
     ! The numerical integrator used here is a version of the polygon (a.k.a. midpoint, leapfrog, or Box method), and similar
@@ -216,6 +216,9 @@ CONTAINS
     IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN   ! is it taking an infinitesimal step?
        h = INFINITESIMAL_STEP_SIZE * Beam%deltas            ! make sure we make some motion
        iSmallStepCtr = iSmallStepCtr + 1   ! keep a count of the number of sequential small steps
+       IF ( STEP_DEBUGGING ) THEN
+          WRITE( PRTFile, * ) 'Small step forced to', h
+       END IF
     ELSE
        iSmallStepCtr = 0                   ! didn't do a small step so reset the counter
     END IF
@@ -262,11 +265,17 @@ CONTAINS
        h = ( Beam%Box%r - ABS( x0( 1 ) ) ) / ABS( urayt( 1 ) )
        x2( 2 ) = x0( 2 ) + h * urayt( 2 )
        x2( 1 ) = SIGN( Beam%Box%r, x0( 1 ) )
+       IF ( STEP_DEBUGGING ) THEN
+          WRITE( PRTFile, * ) 'StepToBdry2D beam box crossing R h to', h, x2
+       END IF
     END IF
     IF ( ABS( x2( 2 ) ) > Beam%Box%z ) THEN
        h = ( Beam%Box%z - ABS( x0( 2 ) ) ) / ABS( urayt( 2 ) )
        x2( 1 ) = x0( 1 ) + h * urayt( 1 )
        x2( 2 ) = SIGN( Beam%Box%z, x0( 2 ) )
+       IF ( STEP_DEBUGGING ) THEN
+          WRITE( PRTFile, * ) 'StepToBdry2D beam box crossing Z h to', h, x2
+       END IF
     END IF
 
     ! top crossing
@@ -363,6 +372,10 @@ CONTAINS
           topRefl = .FALSE.
        ELSE
           botRefl = .FALSE.
+       END IF
+    ELSE
+       IF ( STEP_DEBUGGING ) THEN
+          WRITE( PRTFile, * ) 'StepToBdry2D normal h to', h, x2
        END IF
     END IF
     
