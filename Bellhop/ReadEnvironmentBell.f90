@@ -143,9 +143,6 @@ CONTAINS
        WRITE( PRTFile, fmt = '(  '' Maximum ray x-range, Box%x = '', G11.4, '' m'' )' ) Beam%Box%x
        WRITE( PRTFile, fmt = '(  '' Maximum ray y-range, Box%y = '', G11.4, '' m'' )' ) Beam%Box%y
        WRITE( PRTFile, fmt = '(  '' Maximum ray z-range, Box%z = '', G11.4, '' m'' )' ) Beam%Box%z
-       
-       ! LP: Beam%Box%r will be used in Nx2D.
-       Beam%Box%r = SQRT( Beam%Box%x ** 2 + Beam%Box%y ** 2 )
     ELSE
        READ(  ENVFile, * ) Beam%deltas, Beam%Box%z, Beam%Box%r
 

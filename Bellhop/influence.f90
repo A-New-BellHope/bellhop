@@ -30,6 +30,13 @@ CONTAINS
     COMPLEX (KIND=8) :: pVB( MaxN ), qVB( MaxN ), q, epsV( MaxN ), contri, gammaV( MaxN ), gamma, P_n, P_s
     COMPLEX (KIND=8) :: tau
 
+    SELECT CASE ( Beam%RunType( 1 : 1 ) )
+    CASE ( 'C', 'I', 'S' )   ! TL
+    CASE DEFAULT
+       WRITE( PRTFile, * ) 'Cerveny influence does not support eigenrays or arrivals'
+       CALL ERROUT( 'InfluenceCervenyRayCen', 'Cerveny influence does not support eigenrays or arrivals' )
+    END SELECT
+
 !!! need to add logic related to NRz_per_range
 
     ! During reflection imag(q) is constant and adjacent normals cannot bracket a segment of the TL
@@ -81,10 +88,8 @@ CONTAINS
              ! Compute ray-centered coordinates, (znV, rnV)
 
              ! If normal parallel to TL-line, skip to next step on ray
-             ! LP: Changed from tiny( znV( iS ) ) as this is the smallest
-             ! positive floating point number, which would be equivalent to just
-             ! znV( iS ) == 0.0.
-             IF ( ABS( znV( iS ) ) < SPACING( 1.0 ) ) CYCLE Stepping
+             ! LP: Changed from TINY( znV( iS ) ), see README.md.
+             IF ( ABS( znV( iS ) ) < EPSILON( znV( iS ) ) ) CYCLE Stepping
 
              SELECT CASE ( image )     ! Images of beams
              CASE ( 1 )                ! True beam
@@ -176,6 +181,13 @@ CONTAINS
          c, cimag, cs, cn, csq, gradc( 2 ), crr, crz, czz, rho, deltaz
     COMPLEX (KIND=8) :: pVB( MaxN ), qVB( MaxN ), q, epsV( MaxN ), contri, gammaV( MaxN ), gamma, const
     COMPLEX (KIND=8) :: tau
+
+    SELECT CASE ( Beam%RunType( 1 : 1 ) )
+    CASE ( 'C', 'I', 'S' )   ! TL
+    CASE DEFAULT
+       WRITE( PRTFile, * ) 'Cerveny influence does not support eigenrays or arrivals'
+       CALL ERROUT( 'InfluenceCervenyRayCen', 'Cerveny influence does not support eigenrays or arrivals' )
+    END SELECT
 
     ! need to add logic related to NRz_per_range
 
@@ -678,7 +690,7 @@ CONTAINS
 
     ! LP: Added ABS to match other influence functions. Without it, this will
     ! crash (sqrt of negative real) for rays shot backwards.
-    Ratio1 = SQRT( ABS(  COS( alpha ) ) )
+    Ratio1 = SQRT( ABS( COS( alpha ) ) )
     phase  = 0
     qOld   = 1.0
     BETA   = 0.98  ! Beam Factor

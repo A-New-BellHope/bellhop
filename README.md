@@ -38,10 +38,13 @@ Depending on the exact set of floating-point operations done and the specific
 inputs, these steps "randomly" land just before or just after the boundary. This
 means the step "randomly" ends up in different segments, which leads to further
 differences down the line. While these differences typically have a very small
-effect on the overall ray trajectory, they make comparing the results to [the
-C++/CUDA version](https://github.com/A-New-BellHope/bellhopcuda) very difficult,
-and may in some cases make reproducing results between runs of the Fortran
-program difficult. This has been fixed by overhauling the system which moves the
+effect on the overall ray trajectory, there are several mechanisms (see
+"Detailed information on edge case issues" section below) by which the error can
+be amplified and lead to significantly different results later. This makes
+comparing the results to [the C++/CUDA
+version](https://github.com/A-New-BellHope/bellhopcuda) very difficult, and may
+in some cases make reproducing results between runs of the Fortran program
+difficult. This has been fixed by overhauling the system which moves the
 numerical integration to the boundary to give predictable behavior. This also
 involved changes to reflections (landing on the top or bottom boundary); now
 consistently only two identical points are generated at reflections, one with
@@ -97,10 +100,10 @@ These functions have been rewritten as follows:
 
 ### `RToIR` step-to-edge-case issue
 
-The code `ir = MAX( MIN( INT( ( r - Pos%Rr( r ) ) / Pos%Delta_r ) + 1, Pos%NRr ), 1 )`
+The code `ir = MAX( MIN( INT( ( r - Pos%Rr( 1 ) ) / Pos%Delta_r ) + 1, Pos%NRr ), 1 )`
 or similar is used in various Influence functions. The `INT( )` operation here
 is another edge case which steps often step exactly to. For example, suppose `r`
-is 3000 after a step to a particular segment boundary, `Pos%Rr( r ) == 0`, and
+is 3000 after a step to a particular segment boundary, `Pos%Rr( 1 ) == 0`, and
 `Pos%Delta_r == 500`. The argument to `INT( )` may end up being 5.99999999999998
 or 6.000000000000002 depending on the exact value of `r`, but this would result
 in different values of `ir` and therefore substantially different results. This
@@ -108,6 +111,67 @@ code pattern has been replaced with the function `RToIR`, which will "snap to"
 each integer value of the argument, to ensure these cases are handled
 consistently.
 
+## Algorithm bugs
+
+### Polarity flipping
+
+In `InfluenceCervenyRayCen`, `rnV` was negated for image 2 and again for image 3.
+If `Nimage` was set to 2, this means `rnV` would change sign every step. mbp
+had implemented this differently (without the bug) in `InfluenceCervenyCart`,
+so that implementation was brought to this function.
+
+### Precomputing phase in 2D hat ray-centered influence
+
+In `InfluenceGeoHatRayCen` (2D), the original code did `IncPhaseIfCaustic` (or
+rather, the non-function equivalent of it) within the `Stepping` loop, after
+checking and skipping the step if `irA == irB`. Which steps meet this condition
+depends on `Pos%Rz`, which is receiver information and has nothing to do with
+the ray/beam itself. If `q` goes from negative to positive on one step, the
+caustic will go unnoticed until the next step where `irA != irB`. However, if
+there are TWO caustics during this time (i.e. at two or more sequential steps
+where `irA != irB`), `q` will have gone from negative to positive back to
+negative and the phase change will be completely missed. This means field
+results at one receiver depend on where other receivers are, which is
+non-physical.
+
+mbp had a comment suggesting this be precomputed, which is how it is done in
+the corresponding 3D influence functions, and is the solution which has been
+applied here.
+
+### Arrivals merging
+
+The algorithm in `AddArr` (both 2D and 3D) does not properly handle the case
+where the current arrival is the second step of a pair, but the storage is full
+and the first step of the pair got stored in some slot other than the last one.
+It will only consider the last ray in storage as as a candidate for the first
+half of the pair. This means that whether a given pair is successfully paired or
+not depends on the number of arrivals before that pair, which depends on the
+order rays were computed, which is arbitrary and non-physical.
+
+Fixing the bug would not be difficult, but it would require iterating over all
+arrivals to check for pairs, which would slow things down. It also
+hypothetically could merge arrivals with previous arrivals which were not
+actually paired but happened to have similar delay/phase, though it's not clear
+if this would actually be a problem or not.
+
+In [the C++/CUDA version](https://github.com/A-New-BellHope/bellhopcuda), the
+incorrect behavior was emulated for single-threaded mode, in order to be able to
+compare arrivals results to `BELLHOP`/`BELLHOP3D`. However, for multithreaded
+mode or CUDA, the code was changed to just write the first `MaxNArr` arrivals
+and discard any future ones. It's not clear if it's possible to write a lock-
+free algorithm for "keep the N arrivals with the highest amplitude", due to all
+the other arrival data besides the amplitude which needs to be written and could
+not be written atomically. A mutex-based approach would hurt the multithreaded
+performance and completely destroy the CUDA performance.
+
+### SGB bug with backward-traced rays
+
+The computation for `Ratio1` in SGB (2D) was `SQRT( COS( alpha ) )`, which will
+crash (square root of negative real) for rays shot backwards. All other
+influence functions use `SQRT( ABS( COS( alpha ) ) )`, so the missing `ABS` has
+been added. Also, the way the loop over range works assumes the ray always
+travels towards positive R, which is not true for certain bathymetries or for
+rays shot backwards. This loop has not been fixed.
 
 ## Uninitialized values
 
@@ -156,16 +220,6 @@ only used in conjunction with Cerveny beams, the Cerveny 3D influence function
 `Influence3D` was removed from `BELLHOP3D` before the earliest version we have,
 and none of the 2D environment files use the Cerveny beam-width Cerveny beams.
 
-### New in 2022: Nx2D Beam Box uninitialized value
-
-For BELLHOP3D (3D or Nx2D), `Beam%Box%x,y,z` are initialized, and for BELLHOP
-(2D), `Beam%Box%r,z` are initialized. However, in Nx2D, `TraceRay2D` calls
-`Step2D`. For the new `ray mask using a box centered at` (i.e. Step to Beam
-Box) feature, this uses `Beam%Box%r,z` for 2D (which now includes Nx2D) and
-`Beam%Box%x,y,z` for 3D. The value of `Beam%Box%r` read here is uninitialized.
-This has been initialized to `sqrt(x ** 2 + y ** 2)`, but there are bigger
-problems with Nx2D ReduceStep2D / StepToBdry2D, see below.
-
 ## Missing checks
 
 ### SGB eigenrays and arrivals
@@ -175,6 +229,12 @@ distance from the receiver was commented out, meaning that every ray would be
 an eigenray. Furthermore, it assumed that any run other than eigenrays was
 coherent TL, ignoring incoherent, semi-coherent, and arrivals. This function
 was reworked to use `ApplyContribution` to support all of these run types.
+
+### Non-TL runs not handled correctly in Cerveny influence
+
+The two Cerveny influence functions (ray-centered and Cartesian in 2D; 3D
+Cerveny is referenced in commented out code but not provided) do not support
+eigenray and arrivals runs. This is now checked, instead of silently failing.
 
 ### Missing divide by zero check in Nx2D reflect
 
@@ -188,33 +248,27 @@ In 3D SSP Hexahedral, `SSP%Nz` is assigned to `SSP%NPts` and `SSP%Seg%z` to
 `SSP%z`. However, the latter has a maximum of `MaxSSP` depth values, whereas
 the former did not have a check for exceeding this size. A check has been added.
 
-
 ## Other issues
 
-### Polarity flipping
+### Use of `TINY( )`
 
-In `InfluenceCervenyRayCen`, `rnV` was negated for image 2 and again for image 3.
-If `Nimage` was set to 2, this means `rnV` would change sign every step. mbp
-had implemented this differently (without the bug) in `InfluenceCervenyCart`,
-so that implementation was brought to this function.
-
-### Precomputing phase in 2D hat ray-centered influence
-
-In `InfluenceGeoHatRayCen` (2D), the original code did `IncPhaseIfCaustic` (or
-rather, the non-function equivalent of it) within the `Stepping` loop, after
-checking and skipping the step if `irA == irB`. Which steps meet this condition
-depends on `Pos%Rz`, which is receiver information and has nothing to do with
-the ray/beam itself. If `q` goes from negative to positive on one step, the
-caustic will go unnoticed until the next step where `irA != irB`. However, if
-there are TWO caustics during this time (i.e. at two or more sequential steps
-where `irA != irB`), `q` will have gone from negative to positive back to
-negative and the phase change will be completely missed. This means field
-results at one receiver depend on where other receivers are, which is
-non-physical.
-
-mbp had a comment suggesting this be precomputed, which is how it is done in
-the corresponding 3D influence functions, and is the solution which has been
-applied here.
+In a few places throughout the codebase, `TINY( )` is used to get a small
+number to replace zero, in the sense of `IF ( ABS( a - b ) < 10.0 * TINY( a ) )`
+to replace `IF ( a == b )` which might fail due to floating point inaccuracies.
+However, this is probably the wrong function for this job. `TINY` gives the
+smallest positive number of the given type (note that this should be a
+denormalized number, but `gfortran` gives the smallest positive normalized
+number): `TINY( 1.0 )` is about `1E-38` and `TINY( 1.0D0 )` is about `2E-308`.
+These values are much smaller than typical errors: either `a` will exactly
+equal `b`, or if it's one float larger or smaller, that'll be `SPACING( a )`
+which is about `1E-7` if `a == 1.0` or about `2E-16` if `a == 1.0D0`. So, if
+the original values being compared are known, like in this example we know
+`a` and `b`, the best result would be something like `10.0 * SPACING( a )`.
+If the magnitude of the values which lead to the maybe-zero value are not known,
+as in `IF ( ABS( c ) < ??? )`, a good choice would be `EPSILON( c )`. This has
+been changed in `InfluenceCervenyRayCen`, `ReadRayElevationAngles`, and
+`ReadRayBearingAngles`. The uses of `TINY` in `Reflect` / `Reflect3D` for
+manipulating the `SQRT` branch cut are not an issue and have not been changed.
 
 ### Curvature correction rotation divergence
 
@@ -235,10 +289,18 @@ comment questioning this. The 1000 has been removed.
 `TopGlobalx`, `TopGlobaly`, `BotGlobalx`, and `BotGlobaly` were never
 deallocated. This has been fixed.
 
+### 2D altimetry geoacoustics
+
+Geoacoustics are supported for altimetry (which doesn't really make sense), but
+writing the header for geoacoustics is only supported for bathymetry. Also, in
+both 2D altimetry and bathymetry, when the vectors are echoed, the condition for
+writing the last element after skipping some will never be satisfied due to the
+loop bounds, so it has been fixed.
+
 ### Other
 
-There have been other minor fixes which should not affect results unless you're
-doing something strange. See commit logs.
+Typos in comments and other minor issues have been fixed. See the commit logs if
+you want a full list.
 
 
 # Features which are probably bugs
@@ -293,6 +355,32 @@ between different influence functions.
 This is unlikely to be desired behavior. Just initialize `rA = 0.0` and
 `ir = 1` and remove the other code.
 
+### PCHIP not supported in 3D mode
+
+`PCHIP` SSP is not supported in 3D, despite being very similar to `cubic`, which
+is supported in 3D.
+
+### Receiver inside beam window inconsistencies
+
+The check for whether the receiver is inside the beam window is commented out in
+both 3D Gaussian influence functions. There is code involving `MaxRadius` which
+may have a similar purpose earlier in that function in ray-centered, but not in
+Cartesian, and it's not clear why this condition should be omitted in the 3D but
+not the 2D Gaussian beams. Also, 2D beams consider the receiver to be outside
+the beam if it is on the edge, whereas 3D beams consider the receiver to be
+inside the beam if it is on the edge (e.g. write if `a < BeamWindow` for 2D but
+`a <= BeamWindow` for 3D). Neither of these is more correct than the other, but
+there does not seem to be any reason to have different behavior.
+
+### Influence duplicate point detection inconsistencies
+
+There is a similar set of inconsistencies for the detection of duplicate points.
+All cases use a dynamic threshold, `1.0D3 * SPACING( ray%x( 1 ) )`, except
+for 3D Cartesian ray-centered, which uses a static threshold of `1e-4`. The
+dynamic threshold is commented out in this code. Also, again, in 3D, the point
+is considered a duplicate if its change in position is `<=` the threshold,
+whereas in 2D is it `<` the threshold.
+
 ### Dead code in 3D ray-centered
 
 Both hat and Gaussian 3D ray-centered store `m` and `delta` from `B` to `A`
@@ -305,13 +393,16 @@ stepping loop, but their values are immediately overwritten. It also sets `irA`
 to zero with a comment that this is a flag, but there is no code to check this
 condition.
 
+### Arrivals `REAL( KIND=4 )` conversions
 
-# Issues which could not be fixed in BELLHOP / BELLHOP3D
+In `WriteArrivals` (ASCII/binary, 2D/3D) there is inconsistent conversion to
+32-bit float when writing `A` and `Phase`. This was partly cleaned up in the
+2022 changes, but there are still some inconsistencies. In all but 2D ASCII,
+`Phase` is converted to degrees in 64-bit, whereas in 2D ASCII it is converted
+to degrees in 32-bit; and in all but 3D ASCII, the actual value written is
+32-bit, whereas in 3D ASCII, the value written (in text) is 64-bit.
 
-
-
-
-# Detailed information on some changes
+# Detailed information on edge case issues
 
 ### iSegz, iSegr initialization
 

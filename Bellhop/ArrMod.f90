@@ -39,6 +39,8 @@ CONTAINS
     ! If so, we want to combine the arrivals to conserve space.
     ! (test this by seeing if the arrival time is close to the previous one)
     ! (also need that the phase is about the same to make sure surface and direct paths are not joined)
+    ! LP: BUG: This only checks the last arrival, whereas the first step of the
+    ! pair could have been placed in previous slots. See readme.
 
     IF ( Nt >= 1 ) THEN
        IF ( omega * ABS( delay - Arr( id, ir, Nt )%delay ) < PhaseTol .AND. &
@@ -200,6 +202,8 @@ CONTAINS
     ! If so, we want to combine the arrivals to conserve space.
     ! (test this by seeing if the arrival time is close to the previous one)
     ! (also need that the phase is about the same to make sure surface and direct paths are not joined)
+    ! LP: BUG: This only checks the last arrival, whereas the first step of the
+    ! pair could have been placed in previous slots. See readme.
 
     IF ( Nt >= 1 ) THEN
        IF ( omega * ABS( delay - Arr3D( itheta,  id, ir, Nt )%delay ) < PhaseTol .AND. &
