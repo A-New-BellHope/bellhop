@@ -1,6 +1,8 @@
 # BELLHOP
-A mirror of the original Fortran BELLHOP underwater acoustics simulator, with
-numerical properties and robustness improved and bugs fixed.
+A mirror of the original Fortran BELLHOP/BELLHOP3D underwater acoustics
+simulators, with numerical properties and robustness improved and bugs fixed.
+These changes were made in support of the multithreaded C++/CUDA version of
+BELLHOP/BELLHOP3D: [`bellhopcxx`/`bellhopcuda`](https://github.com/A-New-BellHope/bellhopcuda).
 
 ### Impressum
 
@@ -404,7 +406,131 @@ to degrees in 32-bit; and in all but 3D ASCII, the actual value written is
 
 # Detailed information on edge case issues
 
-### iSegz, iSegr initialization
+### Basic situation
+
+The numerical integration in `BELLHOP`/`BELLHOP3D` operates by taking a trial
+step along the ray with a large step size, and then reducing the step size to
+land on the first "interface or boundary crossing". Then it evaluates the field
+parameters at this trial location, and adjusts the angles for the trial step and
+tries again. Finally, it interpolates between the two trials based on the field
+parameters and commits a step in that resulting direction. Steps are reduced to
+land on whichever of the following comes first (along the ray):
+
+- Plane where SSP changes along Z
+- Crossing to outside the beam box (maximum bounds for all simulation) in R or Z
+  (2D) or in X, Y, or Z (3D) (new in 2022)
+- Crossing and reflecting from the top (ocean surface)
+- Crossing and reflecting from the bottom (ocean floor)
+- Top segment crossing (i.e. where the top definition changes, either due to a
+vertex in its height, or changed parameters; this rarely occurs for the top,
+but often for the bottom), in R (2D) or in X or Y (3D)
+- Bottom segment crossing, in R (2D) or in X or Y (3D)
+- Plane where SSP changes along R (2D) or X or Y (3D)
+- 3D only: crossing the diagonal of the top XY segment (i.e. crossing from one
+  of the triangles to the other, which may have different slopes)
+- 3D only: crossing the diagonal of the bottom XY segment
+
+Each of these boundaries produces a step size, and the smallest one is used.
+Then this step size is used to update the position (and other parameters). Due
+to floating-point numbers having limited precision, in practice it is "random"
+whether the resulting position is slightly before or slightly after the actual
+boundary. For example, if there is a depth SSP change at 1000 m, the position
+may end up being 999.999999994 m or 1000.0000000002 m. This often occurs even
+though, in this example (as is often the case for values provided in a config
+file), the "correct" value (1000.0) is precisely expressible as a floating-
+point number. This is not actually non-deterministic behavior--`BELLHOP`/
+`BELLHOP3D` will produce binary identical outputs for identical input files.
+However, for some set of rays shot toward the same boundary, some set of them
+will land on each side of the boundary, without any discernible pattern to this
+behavior. And a version of `BELLHOP`/`BELLHOP3D` built with a different compiler
+or on a different machine, or of course [our C++/CUDA
+version](https://github.com/A-New-BellHope/bellhopcuda), will produce a
+different pattern.
+
+### Amplifying infinitesimal errors to large errors
+
+Despite this behavior only causing an infinitesimal difference in the resulting
+ray position, this difference gets amplified through multiple interacting
+mechanisms in `BELLHOP`/`BELLHOP3D`. The amplified errors can then show up as
+substantial errors or inconsistencies in the output.
+
+First, the ray which landed on the near side of the boundary will take its next
+step, hit the same boundary again, but cross it due to the enforced minimum step
+size. By itself, this issue immediately causes inconsistent results in ray mode:
+there is a different number of superfluous near-duplicated points, and therefore
+a different number of steps in the ray. In addition, the difference in its
+position (compared to the ray which happened to land on the other side of the
+boundary) has now been amplified from the scale of about 1e-16 from the
+floating-point error, to the minimum step size of about 1e-5. This larger error
+increases the chances of inconsistent behaviors later.
+
+The inconsistency in which side of a boundary a step is to also directly causes
+another issue. There are several stopping conditions for rays, for example the
+level becoming too low, but crucially the last step which violated the stopping
+condition is still written. If a ray stops after a step to a certain boundary,
+whether receivers on that boundary are considered for TL / eigenrays / arrivals
+is determined by whether the ray is behind or ahead of that boundary. Of course,
+since environment files use round numbers, receivers being exactly on boundaries
+is very common! This can substantially change the receiver outputs.
+
+Second, error can accumulate just due to the integration, even without any of
+the "hard edge" cases discussed next. A small error in the initial trajectory
+of a ray can lead the ray to be off by a noticeable amount after traveling
+100 km. Also see the "Curvature correction rotation divergence" section above
+for an example where very small error is compounded every step.
+
+Finally, and most importantly, the physics of `BELLHOP`/`BELLHOP3D` is full of
+"hard edges" or discontinuities, where moving a ray by a very small amount
+creates a completely different result for the future propagation of the ray.
+Some of these discontinuities are unavoidable, for example:
+- If a ray is curving up towards the surface, the difference between curving
+  back down just before it reaches the surface, and reflecting, is a
+  discontinuity. Even if the trajectory is almost flat in both cases, the phase
+  will be inverted if it is reflected.
+- If a ray approaches a vertex of the bottom where the slope changes, whether
+  it hits just before or just after that vertex will completely change the
+  reflection trajectory.
+
+Some of these discontinuities are purely artificial, see for example the
+"Shallow angle range" and "`RToIR` step-to-edge-case issue" sections above. The
+most common example of this is that in TL, eigenrays, or arrivals, a ray being
+considered close enough to a receiver to influence it is a hard edge for certain
+influence types. For runs with tens of thousands each of rays and receivers,
+even if each ray position is only off by 1e-5 meters, it is not rare that a ray
+will be close enough to a receiver to "count" in one case, and too far in the
+other case. Usually the influence near the edge of the beam is low, but
+sometimes this ray will be the only ray to influence a particular receiver. In
+this case, if the ray hits the receiver in the Fortran version and does not hit
+it in the C++/CUDA version, the relative error is 100%; but even worse, if the
+ray does not hit the receiver in the Fortran version but does hit it in the
+C++/CUDA version, the relative error is *infinite*!
+
+### Fix for boundary stepping inconsistency
+
+There is no one fix for all of these circumstances, but a fix has been
+implemented which generally solves the inconsistency about which side of a
+boundary a step is to. First, a function `StepToBdry2D`/`3D` is added which
+corresponds to `ReduceStep2D`/`3D`. This function ensures that after the step,
+the resulting position is *exactly* on the boundary (and if the value is not
+precisely representable in floating-point, that it is the same value as already
+stored in memory for the boundary). Second, the functions which update which
+segment a position is in have been changed to use the ray tangent to resolve
+edge cases, instead of choosing between less-than-or-equal-to versus less-than
+and such. The ray is always placed into the later segment: the segment such that
+it can move forward a nontrival distance and remain in the same segment. The
+idea is, since every step must be an edge case, it is put *exactly* on the edge,
+and then that exactly-on-the-edge position is handled in a consistent manner.
+This gets more complicated for crossing the diagonals in 3D, as the boundary
+is not a single fixed floating-point value from an environment file. In this
+case, flags `Top_tridiag_pos` and `Bot_tridiag_pos` are used to store which side
+of the boundary the ray is on while its position is nearly on top of the
+boundary. The behavior is still to step to the boundary and then be on the
+boundary but in the other side.
+
+### Case study: missing iSegz, iSegr initialization
+
+This particular issue, and the insight gained from debugging it, is what led
+to the creation of this modified `BELLHOP`/`BELLHOP3D` repo.
 
 In `BELLHOP`, `iSegz` and `iSegr` are initialized (to 1) only once globally.
 This means their initial state for each ray is their final state from the
@@ -452,95 +578,14 @@ traced, removing this "random" inconsistent behavior. The SGB bug still stands,
 as fixing it would mean changing the physics, but at least it produces
 reproducible results now.
 
-### Boundary stepping changes
-
-The numerical integration in `BELLHOP` operates by taking a trial step along
-the ray with a large step size, and then reducing the step size to land on the
-first "interface or boundary crossing". Then it evaluates the field parameters
-at this trial location, and adjusts the angles for the trial step and tries
-again. Finally, it interpolates between the two trials based on the field
-parameters and commits a step in that resulting direction. Steps are reduced
-to land on whichever of the following comes first (along the ray):
-
-- Plane where SSP changes along depth
-- Top crossing
-- Bottom crossing
-- Top segment crossing (i.e. where the top definition changes, either due to a
-vertex in its height, or changed parameters; this rarely occurs for the top,
-but often for the bottom)
-- Bottom segment crossing
-- Plane where SSP changes along range
-
-Each of these boundaries produces a step size, and the smallest one is used.
-Then this step size is used to update the position (and other parameters). Due
-to floating-point numbers having limited precision, in practice it is "random"
-whether the resulting position is slightly before or slightly after the actual
-boundary. For example, if there is a depth SSP change at 1000 m, the position
-may end up being 999.999999994 m or 1000.0000000002 m. This often occurs even
-though, in this example (as is often the case for values provided in a config
-file), the "correct" value (1000.0) is precisely expressible as a floating-
-point number. This is not actually non-deterministic behavior--`BELLHOP` will
-produce binary identical outputs for identical input files. However, for some
-set of rays shot toward the same boundary, some set of them will land on each
-side of the boundary, without any discernible pattern to this behavior. And a
-version of `BELLHOP` built with a different compiler or on a different machine,
-or of course [our C++/CUDA version](https://github.com/A-New-BellHope/bellhopcuda),
-will produce a different pattern.
-
-Despite this behavior only causing an infinitesimal difference in the resulting
-ray position, this difference gets amplified by `BELLHOP`, and can lead to a
-number of inconsistent results later. First, the ray which landed on the near
-side of the boundary will take its next step, hit the same boundary again, but
-cross it due to the enforced minimum step size. In addition to this ray now
-having an extra step, the difference in its position (compared to the ray which
-happened to land on the other side of the boundary) has now been amplified from
-the scale of about 1e-16 from the floating-point error, to the minimum step size
-of about 1e-5. While this is still not a significant difference in the ray
-trajectory, some of the issues this can cause are:
-- In ray mode, the number of steps in the ray is different; there is a different
-number of superfluous near-duplicated points.
-- In TL, eigenrays, or arrivals, a ray being considered close enough to a
-receiver to influence it is a hard edge for certain influence types. For runs
-with tens of thousands each of rays and receivers, it is not rare that a ray
-will be close enough to a receiver to "count" in one case, and too far in the
-other case. If this ray happens to be the only ray to influence this receiver,
-the relative difference between the finite field and zero is an *infinite* error!
-- If the ray approaches a corner between two different boundaries (e.g. SSP
-depth and range)--as is not rare in the environment files where everything is
-round numbers!--the ray may hit one boundary or the other first depending on
-the slight change to its trajectory. And depending on the boundaries, this can
-lead to much larger changes to the ray trajectory. For example, suppose a SSP
-range interface occurs at 10 km, and a vertex of the bottom is also at 10 km,
-with a seamount beginning to rise. If the ray hits the bottom first, it will
-reflect and miss the seamount, whereas if it hits the range interface first, it
-will then hit the seamount and reflect in a completely different direction.
-- There are several stopping conditions for rays, for example the level becoming
-too low, but crucially the last step which violated the stopping condition is
-still written. If a ray stops after a step to a certain boundary, whether
-receivers on that boundary are considered for TL / eigenrays / arrivals is
-determined by whether the ray is behind or ahead of that boundary. Of course,
-since environment files use round numbers, receivers being exactly on boundaries
-is very common! This can substantially change their outputs.
-
-These issues are fixed with two main changes. First, a function `StepToBdry2D`
-is added which corresponds to `ReduceStep2D`. This function ensures that after
-the step, the resulting position is *exactly* on the boundary (and if the value
-is not precisely representable in floating-point, that it is the same value as
-already stored in memory for the boundary). Second, the functions which update
-which segment a position is in have been changed to use the ray tangent to
-resolve edge cases, instead of choosing between less-than-or-equal-to versus
-less-than and such. The ray is always placed into the later segment: the
-segment such that it can move forward a nontrival distance and remain in the
-same segment. The idea is, since every step must be an edge case, they are
-*exactly* on the edge, and then that exactly-on-the-edge position are handled in
-a consistent manner.
-
 # Other information
 
 See index.htm for information from the original repo.
 
-Code retrieved 12/17/21 from http://oalib.hlsresearch.com/AcousticsToolbox/ ,
-and was claimed to have been last updated 11/4/20.
+Code initially retrieved 12/17/21 from http://oalib.hlsresearch.com/AcousticsToolbox/ ,
+the version labeled 11/4/20. In late 2022, the diff between mbp's newer 4/20/22
+and 11/4/20 releases was computed, and the changes were applied to this code
+(with appropriate changes to integrate them).
 
 Files pertaining to the other simulators (Krakel, Kraken, KrakenField, Scooter)
 have been removed.
