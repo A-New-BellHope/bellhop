@@ -16,14 +16,14 @@ MODULE Influence
   COMPLEX (KIND=8), PRIVATE :: delay
 
 CONTAINS
-  SUBROUTINE InfluenceCervenyRayCen( U, epsilon, alpha, iBeamWindow2, RadiusMax )
+  SUBROUTINE InfluenceCervenyRayCen( U, eps, alpha, iBeamWindow2, RadiusMax )
 
     ! Paraxial (Cerveny-style) beams in ray-centered coordinates
 
     INTEGER,          INTENT( IN    ) :: IBeamWindow2
     REAL    (KIND=8), INTENT( IN    ) :: alpha, RadiusMax                ! take-off angle
     COMPLEX,          INTENT( INOUT ) :: U( NRz_per_range, Pos%NRr )  ! complex pressure field
-    COMPLEX (KIND=8), INTENT( IN    ) :: epsilon
+    COMPLEX (KIND=8), INTENT( IN    ) :: eps                          ! LP: EPSILON is an intrinsic
     INTEGER          :: ir1, ir2, KMAHV( MaxN ), KMAH, image
     REAL    (KIND=8) :: nA, nB, nSq, c, zr, Polarity
     REAL    (KIND=8) :: znV( Beam%Nsteps ), rnV( Beam%Nsteps )   ! ray normal
@@ -45,7 +45,7 @@ CONTAINS
     IF ( Beam%Type( 2 : 2 ) == 'C' ) THEN
        epsV( 1 : Beam%Nsteps ) = i * ABS( ray2D( 1 : Beam%Nsteps )%q( 1 ) / ray2D( 1 : Beam%Nsteps )%q( 2 ) )
     ELSE
-       epsV( 1 : Beam%Nsteps ) = epsilon
+       epsV( 1 : Beam%Nsteps ) = eps
     END IF
 
     pVB(    1 : Beam%Nsteps ) = ray2D( 1 : Beam%Nsteps )%p( 1 ) + epsV( 1 : Beam%Nsteps ) * ray2D( 1 : Beam%Nsteps )%p( 2 )
@@ -168,14 +168,14 @@ CONTAINS
 
   ! **********************************************************************!
 
-  SUBROUTINE InfluenceCervenyCart( U, epsilon, alpha, iBeamWindow2, RadiusMax )
+  SUBROUTINE InfluenceCervenyCart( U, eps, alpha, iBeamWindow2, RadiusMax )
 
     ! Paraxial (Cerveny-style) beams in Cartesian coordinates
 
     INTEGER,          INTENT( IN    ) :: IBeamWindow2
     REAL    (KIND=8), INTENT( IN    ) :: alpha, RadiusMax                ! take-off angle
     COMPLEX,          INTENT( INOUT ) :: U( NRz_per_range, Pos%NRr )  ! complex pressure field
-    COMPLEX (KIND=8), INTENT( IN    ) :: epsilon
+    COMPLEX (KIND=8), INTENT( IN    ) :: eps                          ! LP: EPSILON is an intrinsic
     INTEGER          :: KMAHV( MaxN ), KMAH, irA, irB, Image
     REAL    (KIND=8) :: x( 2 ), rayt( 2 ), rayn( 2 ), Tr, Tz, zr, Polarity = 1, &
          c, cimag, cs, cn, csq, gradc( 2 ), crr, crz, czz, rho, deltaz
@@ -197,7 +197,7 @@ CONTAINS
     IF ( Beam%Type( 2 : 2 ) == 'C' ) THEN
        epsV( 1 : Beam%Nsteps ) = i * ABS( ray2D( 1 : Beam%Nsteps )%q( 1 ) / ray2D( 1 : Beam%Nsteps )%q( 2 ) )
     ELSE
-       epsV( 1 : Beam%Nsteps ) = epsilon
+       epsV( 1 : Beam%Nsteps ) = eps
     END IF
 
     pVB( 1 : Beam%Nsteps ) = ray2D( 1 : Beam%Nsteps )%p( 1 ) + epsV( 1 : Beam%Nsteps ) * ray2D( 1 : Beam%Nsteps )%p( 2 )

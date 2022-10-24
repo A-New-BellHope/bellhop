@@ -62,8 +62,9 @@ CONTAINS
 
     ! full 360-degree sweep? remove duplicate beam
     ! LP: Changed from TINY( ), see README.md.
-    IF ( Angles%Nalpha > 1 .AND. ABS( MOD( Angles%alpha( Angles%Nalpha ) - Angles%alpha( 1 ), 360.0D0 ) ) < 10.0 * SPACING( 360.0D0 ) ) &
-         Angles%Nalpha = Angles%Nalpha - 1
+    IF ( Angles%Nalpha > 1 .AND. ABS( MOD( Angles%alpha( Angles%Nalpha ) - Angles%alpha( 1 ), &
+       360.0D0 ) ) < 10.0 * SPACING( 360.0D0 ) ) &
+       Angles%Nalpha = Angles%Nalpha - 1
 
     WRITE( PRTFile, * ) '__________________________________________________________________________'
     WRITE( PRTFile, * )
@@ -116,8 +117,9 @@ CONTAINS
 
     ! full 360-degree sweep? remove duplicate beam
     ! LP: Changed from TINY( ), see README.md.
-    IF ( Angles%Nbeta > 1 .AND. ABS( MOD( Angles%beta( Angles%Nbeta ) - Angles%beta( 1 ), 360.0D0 ) ) < 10.0 * SPACING( 360.0D0 ) ) &
-         Angles%Nbeta = Angles%Nbeta - 1
+    IF ( Angles%Nbeta > 1 .AND. ABS( MOD( Angles%beta( Angles%Nbeta ) - Angles%beta( 1 ), &
+       360.0D0 ) ) < 10.0 * SPACING( 360.0D0 ) ) &
+       Angles%Nbeta = Angles%Nbeta - 1
 
     ! Nx2D CASE: beams must lie on rcvr radials--- replace beta with theta
     IF ( RunType( 6 : 6 ) == '2' .AND. RunType( 1 : 1 ) /= 'R' ) THEN
