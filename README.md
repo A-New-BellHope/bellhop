@@ -1,8 +1,8 @@
 # BELLHOP
-A mirror of the original Fortran BELLHOP/BELLHOP3D underwater acoustics
+A mirror of the original Fortran `BELLHOP`/`BELLHOP3D` underwater acoustics
 simulators, with numerical properties and robustness improved and bugs fixed.
-These changes were made in support of the multithreaded C++/CUDA version of
-BELLHOP/BELLHOP3D: [`bellhopcxx`/`bellhopcuda`](https://github.com/A-New-BellHope/bellhopcuda).
+These changes were made in support of the [multithreaded C++/CUDA version of
+BELLHOP/BELLHOP3D: `bellhopcxx`/`bellhopcuda`](https://github.com/A-New-BellHope/bellhopcuda).
 
 ### Impressum
 
@@ -152,8 +152,8 @@ order rays were computed, which is arbitrary and non-physical.
 
 Fixing the bug would not be difficult, but it would require iterating over all
 arrivals to check for pairs, which would slow things down. It also
-hypothetically could merge arrivals with previous arrivals which were not
-actually paired but happened to have similar delay/phase, though it's not clear
+hypothetically could merge arrivals with previous arrivals which are not part of
+the same pair but happened to have similar delay/phase, though it's not clear
 if this would actually be a problem or not.
 
 In [the C++/CUDA version](https://github.com/A-New-BellHope/bellhopcuda), the
@@ -181,10 +181,10 @@ rays shot backwards. This loop has not been fixed.
 
 In `BELLHOP`, `iSegz` and `iSegr` are initialized (to 1) only once globally. In
 some cases (a source on a boundary), in conjunction with other subtle issues
-(see below), the missing initialization caused the initial state of one ray to
-be dependent on the final state of the previous ray, which is obviously
-non-physical and makes reproducing certain results impossible. This has been
-fixed by reinitializing them before every ray.
+(see Case Study below), the missing initialization caused the initial state of
+one ray to be dependent on the final state of the previous ray, which is
+obviously non-physical and makes reproducing certain results impossible. This
+has been fixed by reinitializing them before every ray.
 
 ### Missing initialization on some beam parameters
 
@@ -291,13 +291,11 @@ comment questioning this. The 1000 has been removed.
 `TopGlobalx`, `TopGlobaly`, `BotGlobalx`, and `BotGlobaly` were never
 deallocated. This has been fixed.
 
-### 2D altimetry geoacoustics
+### Echo vector last value
 
-Geoacoustics are supported for altimetry (which doesn't really make sense), but
-writing the header for geoacoustics is only supported for bathymetry. Also, in
-both 2D altimetry and bathymetry, when the vectors are echoed, the condition for
-writing the last element after skipping some will never be satisfied due to the
-loop bounds, so it has been fixed.
+In both 2D altimetry and bathymetry, when the vectors are echoed, the condition
+for writing the last element after skipping some will never be satisfied due to
+the loop bounds. This condition has been fixed.
 
 ### Other
 
@@ -383,6 +381,11 @@ dynamic threshold is commented out in this code. Also, again, in 3D, the point
 is considered a duplicate if its change in position is `<=` the threshold,
 whereas in 2D is it `<` the threshold.
 
+### 2D altimetry geoacoustics
+
+Geoacoustics are supported for altimetry (which doesn't really make sense), but
+writing the header for geoacoustics is only supported for bathymetry.
+
 ### Dead code in 3D ray-centered
 
 Both hat and Gaussian 3D ray-centered store `m` and `delta` from `B` to `A`
@@ -454,12 +457,12 @@ ray position, this difference gets amplified through multiple interacting
 mechanisms in `BELLHOP`/`BELLHOP3D`. The amplified errors can then show up as
 substantial errors or inconsistencies in the output.
 
-First, the ray which landed on the near side of the boundary will take its next
+First, a ray which lands on the near side of the boundary will take its next
 step, hit the same boundary again, but cross it due to the enforced minimum step
 size. By itself, this issue immediately causes inconsistent results in ray mode:
 there is a different number of superfluous near-duplicated points, and therefore
 a different number of steps in the ray. In addition, the difference in its
-position (compared to the ray which happened to land on the other side of the
+position (compared to a ray which happens to land on the other side of the
 boundary) has now been amplified from the scale of about 1e-16 from the
 floating-point error, to the minimum step size of about 1e-5. This larger error
 increases the chances of inconsistent behaviors later.
@@ -491,18 +494,18 @@ Some of these discontinuities are unavoidable, for example:
   it hits just before or just after that vertex will completely change the
   reflection trajectory.
 
-Some of these discontinuities are purely artificial, see for example the
-"Shallow angle range" and "`RToIR` step-to-edge-case issue" sections above. The
-most common example of this is that in TL, eigenrays, or arrivals, a ray being
-considered close enough to a receiver to influence it is a hard edge for certain
-influence types. For runs with tens of thousands each of rays and receivers,
-even if each ray position is only off by 1e-5 meters, it is not rare that a ray
-will be close enough to a receiver to "count" in one case, and too far in the
-other case. Usually the influence near the edge of the beam is low, but
-sometimes this ray will be the only ray to influence a particular receiver. In
-this case, if the ray hits the receiver in the Fortran version and does not hit
-it in the C++/CUDA version, the relative error is 100%; but even worse, if the
-ray does not hit the receiver in the Fortran version but does hit it in the
+Nevertheless, some of these discontinuities are purely artificial, see for
+example the "Shallow angle range" and "`RToIR` step-to-edge-case issue" sections
+above. The most common example of this is that in TL, eigenrays, or arrivals, a
+ray being considered close enough to a receiver to influence it is a hard edge
+for certain influence types. For runs with tens of thousands each of rays and
+receivers, even if each ray position is only off by 1e-5 meters, it is not rare
+that a ray will be close enough to a receiver to "count" in one case, and too
+far in the other case. Usually the influence near the edge of the beam is low,
+but sometimes this ray will be the only ray to influence a particular receiver.
+In this case, if the ray hits the receiver in the Fortran version and does not
+hit it in the C++/CUDA version, the relative error is 100%; but even worse, if
+the ray does not hit the receiver in the Fortran version but does hit it in the
 C++/CUDA version, the relative error is *infinite*!
 
 ### Fix for boundary stepping inconsistency
@@ -529,8 +532,8 @@ boundary but in the other side.
 
 ### Case study: missing iSegz, iSegr initialization
 
-This particular issue, and the insight gained from debugging it, is what led
-to the creation of this modified `BELLHOP`/`BELLHOP3D` repo.
+This particular issue, and the insight gained from debugging it, is what
+initially led to the creation of this modified `BELLHOP`/`BELLHOP3D` repo.
 
 In `BELLHOP`, `iSegz` and `iSegr` are initialized (to 1) only once globally.
 This means their initial state for each ray is their final state from the
