@@ -86,6 +86,10 @@ CONTAINS
     CASE ( 'Q' )
        CALL Quad(     x, t, c, cimag, gradc, crr, crz, czz, rho, freq, Task )
     CASE ( 'H' )
+       IF ( Task == 'TAB' ) THEN
+          WRITE( PRTFile, * ) 'BELLHOP: EvaluateSSP: Hexahedral is not a valid SSP in 2D mode'
+          CALL ERROUT( 'BELLHOP: EvaluateSSP', 'Hexahedral is not a valid SSP in 2D mode')
+       END IF
        ! this is called by BELLHOP3D only once, during READIN
        ! possibly the logic should be changed to call EvaluateSSP2D or 3D
        x3 = [ 0.0D0, 0.0D0, x( 2 ) ]
