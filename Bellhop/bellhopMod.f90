@@ -7,7 +7,7 @@ MODULE bellhopMod
   ! Note space is wasted in NumTopBnc, NumBotBnc ...
 
   LOGICAL            :: ThreeD   ! flag to indicate BELLHOP vs BELLHOP3D run
-  INTEGER            :: Nrz_per_range, iStep
+  INTEGER            :: Nrz_per_range
   REAL    ( KIND= 8) :: freq, omega, SrcDeclAngle, SrcAzimAngle, xs_3D( 3 )
   CHARACTER (LEN=80) :: Title
 

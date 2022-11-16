@@ -508,7 +508,8 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
      RETURN       ! source must be within the medium
   END IF
 
-  Stepping: DO istep = 1, MaxN - 1
+  ! LP: Changed from loop istep to MaxN-1, as is will hit MaxN-3 first.
+  Stepping: DO WHILE ( .TRUE. )
      is  = is + 1
      is1 = is + 1
 

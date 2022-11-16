@@ -534,7 +534,7 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
      RETURN       ! source must be within the medium
   END IF
 
-  Stepping: DO istep = 1, MaxN - 1
+  Stepping: DO WHILE ( .TRUE. )
      is  = is + 1
      is1 = is + 1
 
@@ -874,7 +874,7 @@ SUBROUTINE TraceRay3D( alpha, beta, epsilon, Amp0 )
      RETURN       ! source must be within the medium
   END IF
 
-  Stepping: DO istep = 1, MaxN - 1
+  Stepping: DO WHILE ( .TRUE. )
      is  = is + 1
      is1 = is + 1
 
