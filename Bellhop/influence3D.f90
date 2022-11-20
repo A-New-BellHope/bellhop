@@ -796,11 +796,12 @@ CONTAINS
     CASE ( 'C'  )     ! coherent TL
        U = U + CMPLX( Amp * EXP( -i * ( omega * delay - phaseInt ) ) )
     CASE DEFAULT      ! incoherent/semi-coherent TL
-       IF ( Beam%Type( 1 : 1 ) == 'B' ) THEN   ! Gaussian beam
+       SELECT CASE( Beam%Type( 1 : 1 ) )
+       CASE ( 'B', 'b' )   ! Gaussian beam
           U = U + SNGL( 2. * pi * ( const * EXP( AIMAG( omega * delay ) ) ) ** 2 * W )
-       ELSE
+       CASE DEFAULT
           U = U + SNGL(           ( const * EXP( AIMAG( omega * delay ) ) ) ** 2 * W )
-       END IF
+       END SELECT
     END SELECT
 
   END SUBROUTINE ApplyContribution

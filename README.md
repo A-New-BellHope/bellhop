@@ -115,6 +115,13 @@ consistently.
 
 ## Algorithm bugs
 
+### Incorrect handling of 3D Gaussian ray-centered semi-coherent or incoherent
+
+The code that applies the factor of 2*pi for Gaussian beams to semi-coherent or
+incoherent in 3D `ApplyContribution` only checked if the beam was Gaussian
+Cartesian (`'B'`), not Gaussian ray-centered (`'b'`), so the latter did not get
+the 2*pi factor. This has been fixed.
+
 ### Polarity flipping
 
 In `InfluenceCervenyRayCen`, `rnV` was negated for image 2 and again for image 3.
