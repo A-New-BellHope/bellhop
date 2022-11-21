@@ -279,6 +279,14 @@ been changed in `InfluenceCervenyRayCen`, `ReadRayElevationAngles`, and
 `ReadRayBearingAngles`. The uses of `TINY` in `Reflect` / `Reflect3D` for
 manipulating the `SQRT` branch cut are not an issue and have not been changed.
 
+### Fixed value of `pi`
+
+`pi` was previously defined to be `3.1415926535898D0`. The closest double
+precision floating point number (`REAL( KIND=8 )`) to the true value of pi is
+`0x400921FB54442D18`, or about `3.1415926535897932D0`, so the definition has
+been replaced with this. The value which pi was previously defined to be was in
+error by about `-7e-15` or 16 ULPs, which lead to divergence in some cases.
+
 ### Curvature correction rotation divergence
 
 In `CurvatureCorrection2` in `Reflect3DMod`, even if there is no curvature

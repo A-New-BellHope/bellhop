@@ -192,6 +192,8 @@ CONTAINS
           rlen = NORM2( rayt )
 
           IF ( rlen > 1.0D3 * SPACING( ray3D( is )%x( 1 ) ) ) THEN  ! Make sure this is not a duplicate point
+              ! WRITE( PRTFile, * ) 'is rA rB', is-2, rA, rB
+              
              rayt = rayt / rlen                                     ! unit tangent to ray
              CALL RayNormal_unit( rayt, ray3D( is )%phi, e1, e2 )   ! Get ray normals e1 and e2
 
@@ -261,7 +263,7 @@ CONTAINS
                       zmin = MIN( ray3D( is - 1 )%x( 3 ), ray3D( is )%x( 3 ) ) - L_z  ! min depth of ray segment
                       zmax = MAX( ray3D( is - 1 )%x( 3 ), ray3D( is )%x( 3 ) ) + L_z  ! max depth of ray segment
                       
-                      ! WRITE( PRTFile, * ) 'step ir itheta m_prime L_diag', is-2, ir-1, itheta-1, m_prime, L_diag
+                      ! WRITE( PRTFile, * ) 'step ir itheta', is-2, ir-1, itheta-1
 
                       ReceiverDepths: DO iz = 1, Pos%Nrz
                          x_rcvr( 3 ) = DBLE( Pos%rz( iz ) )   ! z coordinate of the receiver
@@ -305,6 +307,8 @@ CONTAINS
                          const = ray3D( is )%Amp / SQRT( ABS( DetQint ) )
                          W     = ( 1 - a ) * ( 1 - b )   ! hat function: 1 on center, 0 on edge
                          Amp   = const * W
+                         
+                         ! WRITE( PRTFile, * ) iz-1
 
                          CALL ApplyContribution( alpha, beta, P( itheta, iz, ir ) )
                       END DO ReceiverDepths

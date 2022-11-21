@@ -166,7 +166,7 @@ CONTAINS
       cn2jump = DOT_PRODUCT( gradcjump, rayn2 )
       csjump  = DOT_PRODUCT( gradcjump, rayt  )
       
-      WRITE( PRTFile, * ) 'cn1 cn2 cs jumps', cn1jump, cn2jump, csjump
+      ! WRITE( PRTFile, * ) 'cn1 cn2 cs jumps', cn1jump, cn2jump, csjump
 
       RM = Tg / Th   ! this is tan( alpha ) where alpha is the angle of incidence
       R1 = RM * ( 2 * cn1jump - RM * csjump ) / c2 ** 2
