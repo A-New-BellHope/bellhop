@@ -175,8 +175,6 @@ SUBROUTINE BellhopCore
      ALLOCATE ( Arr3D( Pos%Ntheta, NRz_per_range, Pos%NRr, 1 ), NArr3D( Pos%Ntheta, NRz_per_range, Pos%NRr ), Stat = IAllocStat )
   END SELECT
 
-  NArr3D( 1 : Pos%Ntheta, 1 : NRz_per_range, 1 : Pos%NRr ) = 0
-  
   ALLOCATE( x_rcvrMat( 2, Pos%Ntheta, Pos%NRr ), t_rcvr( 2, Pos%Ntheta ), Stat = IAllocStat )
   IF ( IAllocStat /= 0 ) CALL ERROUT( 'BELLHOP', &
        'Insufficient memory to x_rcvrMat; reduce Nr or Ntheta' )
@@ -194,6 +192,7 @@ SUBROUTINE BellhopCore
         Source_y: DO isy = 1, Pos%Nsy   ! loop over source y-coordinate
            P = 0.0 !  Zero out field matrix
            U = 0.0
+           NArr3D = 0 ! LP: Zero out 3D arrival matrix
            
            ! IF ( r( 1 ) == 0.0 ) r( 1 ) = 1.0
            xs_3D = [ Pos%sx( isx ), Pos%sy( isy ), Pos%sz( isz ) ]

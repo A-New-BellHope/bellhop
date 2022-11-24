@@ -115,6 +115,23 @@ consistently.
 
 ## Algorithm bugs
 
+### Clobbering of `rayt` in 3D arrivals
+
+`ApplyContribution` (3D) in arrivals mode wrote to `rayt`, and computed it as
+the non-normalized ray tangent (difference between two consecutive ray points).
+Its value in the two Cartesian influence functions is the normalized ray
+tangent; it is computed once per step. This value will be clobbered by the first
+arrival, and incorrect when computing arrivals at any other receivers in the
+same step. This has been fixed.
+
+### Missing clearing of 3D arrivals matrix with multiple sources
+
+For 3D runs with multiple sources, the arrivals matrix was never cleared between
+sources, so receivers had all the arrivals from earlier sources plus new
+arrivals from the new sources. This has been fixed. This did not affect Nx2D
+because it overwrites slices of the 3D arrivals matrix from the 2D one, which
+ends up overwriting all parts of the 3D matrix.
+
 ### Incorrect handling of 3D Gaussian ray-centered semi-coherent or incoherent
 
 The code that applies the factor of 2*pi for Gaussian beams to semi-coherent or

@@ -228,8 +228,6 @@ SUBROUTINE BellhopCore
      ALLOCATE ( Arr( NRz_per_range, Pos%NRr, 1 ), NArr( NRz_per_range, Pos%NRr ), Stat = IAllocStat )
   END SELECT
 
-  NArr( 1 : NRz_per_range, 1 : Pos%NRr ) = 0
-
   WRITE( PRTFile, * )
 
   SourceDepth: DO is = 1, Pos%NSz

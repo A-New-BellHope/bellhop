@@ -785,14 +785,15 @@ CONTAINS
 
     REAL ( KIND=8 ), INTENT( IN    ) :: alpha, beta         ! ray take-off angle
     COMPLEX,         INTENT( INOUT ) :: U
+    REAL ( KIND=8 )                  :: rayt2( 3 ) ! LP: Don't want to clobber rayt!
 
     SELECT CASE( Beam%RunType( 1 : 1 ) )
     CASE ( 'E' )      ! eigenrays
        CALL WriteRay3D( alpha, beta, is )   ! produces no output if NR=1
     CASE ( 'A', 'a' ) ! arrivals
-       rayt = ray3D( is )%x - ray3D( is - 1 )%x ! ray tangent !!! does this always need to be done???
-       RcvrDeclAngle = RadDeg * ATAN2( rayt( 3 ), NORM2( rayt( 1 : 2 ) ) )
-       RcvrAzimAngle = RadDeg * ATAN2( rayt( 2 ), rayt( 1 ) )
+       rayt2 = ray3D( is )%x - ray3D( is - 1 )%x ! ray tangent !!! does this always need to be done???
+       RcvrDeclAngle = RadDeg * ATAN2( rayt2( 3 ), NORM2( rayt2( 1 : 2 ) ) )
+       RcvrAzimAngle = RadDeg * ATAN2( rayt2( 2 ), rayt2( 1 ) )
 
        CALL AddArr3D( omega, itheta, iz, ir, Amp, phaseInt, delay, &
             SrcDeclAngle, SrcAzimAngle, RcvrDeclAngle, RcvrAzimAngle, &
