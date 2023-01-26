@@ -22,6 +22,14 @@ CONTAINS
     REAL (KIND=8), INTENT( IN ) :: alpha0   ! take-off angle of this ray
 
     ! compression
+    ! LP: This is silly for two reasons:
+    ! 1) MaxN (maximum number of steps for a ray) is 100000, but MaxNRayPoints
+    !    is 500000. Therefore iSkip will always be 1, and the whole vector will
+    !    always be written.
+    ! 2) Even if these constants were changed, the formula for iSkip is not
+    !    ideal: iSkip will only become 2 once the number of steps in the ray is
+    !    more than 2x MaxNRayPoints. If it's less than this, it'll just be
+    !    truncated, which is arguably worse than skipping every other step.
 
     N2    = 1
     iSkip = MAX( Nsteps1 / MaxNRayPoints, 1 )
@@ -66,6 +74,8 @@ CONTAINS
     END IF
 
     ! compression
+    ! LP: Besides the problems mentioned above in the 2D version, this also does
+    ! nothing because iSkip is overridden to 1 below.
 
     N2    = 1
     iSkip = MAX( Nsteps1 / MaxNRayPoints, 1 )
