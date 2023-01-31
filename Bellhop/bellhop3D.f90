@@ -72,7 +72,10 @@ PROGRAM BELLHOP3D
 
   IMPLICIT NONE
   LOGICAL,   PARAMETER :: ThreeD = .TRUE.
+  REAL( KIND=8 ), PARAMETER :: PerturbAmt = 1D-4
   CHARACTER ( LEN=80 ) :: FileRoot
+  
+  CALL RANDOM_SEED( )
 
   ! get the file root for naming all input and output files
   ! should add some checks here ...
@@ -481,6 +484,7 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
   REAL     (KIND=8) :: DistBegTop, DistEndTop, DistBegBot, DistEndBot ! Distances from ray beginning, end to top and bottom
   REAL     (KIND=8) :: tradial( 2 ), BotnInt( 3 ), TopnInt( 3 ), s1, s2
   REAL     (KIND=8) :: z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy
+  REAL     (KIND=8) :: perturb( 2 )
 
   ! *** Initial conditions ***
 
@@ -515,6 +519,10 @@ SUBROUTINE TraceRay2D( xs, alpha, beta, Amp0 )
   Stepping: DO istep = 1, MaxN - 1
      is  = is + 1
      is1 = is + 1
+     
+     CALL RANDOM_NUMBER( perturb )
+     perturb = ( 2.0 * perturb - 1.0 ) * PerturbAmt
+     ray2D( is )%x = ray2D( is )%x + perturb
 
      CALL Step2D( ray2D( is ), ray2D( is1 ), xs, tradial )
 
@@ -777,6 +785,7 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
   REAL     (KIND=8) :: TopnInt( 3 ), BotnInt( 3 )
   REAL     (KIND=8) :: s1, s2
   REAL     (KIND=8) :: z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy
+  REAL     (KIND=8) :: perturb( 3 )
 
   ! *** Initial conditions ***
 
@@ -831,6 +840,10 @@ SUBROUTINE TraceRay3D( xs, alpha, beta, epsilon, Amp0 )
   Stepping: DO istep = 1, MaxN - 1
      is  = is + 1
      is1 = is + 1
+     
+     CALL RANDOM_NUMBER( perturb )
+     perturb = ( 2.0 * perturb - 1.0 ) * PerturbAmt
+     ray3D( is )%x = ray3D( is )%x + perturb
 
      CALL Step3D( ray3D( is ), ray3D( is1 ) )
      CALL GetTopSeg3D( ray3D( is1 )%x )   ! identify the top    segment above the source

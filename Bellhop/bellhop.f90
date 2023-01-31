@@ -33,9 +33,12 @@ PROGRAM BELLHOP
   IMPLICIT NONE
   
   LOGICAL, PARAMETER   :: ThreeD = .FALSE., Inline = .FALSE.
+  REAL( KIND=8 ), PARAMETER :: PerturbAmt = 1D-4
   INTEGER              :: jj
   CHARACTER ( LEN=2  ) :: AttenUnit
   CHARACTER ( LEN=80 ) :: FileRoot
+
+  CALL RANDOM_SEED( )
 
   ! get the file root for naming all input and output files
   ! should add some checks here ...
@@ -431,6 +434,7 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
   REAL     (KIND=8) :: dEndTop( 2 ), dEndBot( 2 ), TopnInt( 2 ), BotnInt( 2 ), ToptInt( 2 ), BottInt( 2 )
   REAL     (KIND=8) :: DistBegTop, DistEndTop, DistBegBot, DistEndBot ! Distances from ray beginning, end to top and bottom
   REAL     (KIND=8) :: sss
+  REAL     (KIND=8) :: perturb( 2 )
 
   ! Initial conditions
 
@@ -482,6 +486,10 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
   Stepping: DO istep = 1, MaxN - 1
      is  = is + 1
      is1 = is + 1
+     
+     CALL RANDOM_NUMBER( perturb )
+     perturb = ( 2.0 * perturb - 1.0 ) * PerturbAmt
+     ray2D( is )%x = ray2D( is )%x + perturb
 
      CALL Step2D( ray2D( is ), ray2D( is1 ),  &
           Top( IsegTop )%x, Top( IsegTop )%n, &
@@ -770,5 +778,3 @@ SUBROUTINE Reflect2D( is, HS, BotTop, tBdry, nBdry, kappa, RefC, Npts )
 END SUBROUTINE Reflect2D
 
 END PROGRAM BELLHOP
-
-
