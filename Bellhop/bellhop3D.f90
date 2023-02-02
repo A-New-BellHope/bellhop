@@ -523,9 +523,7 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
   IsegTopy = 1
   IsegBotx = 1
   IsegBoty = 1
-  t_o( 1 ) = ray2D( 1 )%t( 1 ) * tradial( 1 )
-  t_o( 2 ) = ray2D( 1 )%t( 1 ) * tradial( 2 )
-  t_o( 3 ) = ray2D( 1 )%t( 2 )
+  t_o = RayToOceanT( ray2D( 1 )%t, tradial )
   CALL GetTopSeg3D( xs_3D, t_o, .TRUE. )   ! identify the top    segment above the source
   CALL GetBotSeg3D( xs_3D, t_o, .TRUE. )   ! identify the bottom segment below the source
 
@@ -545,12 +543,8 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
      CALL Step2D( ray2D( is ), ray2D( is1 ), tradial )
 
      ! convert polar coordinate of ray to x-y coordinate
-     x( 1 ) = xs_3D( 1 ) + ray2D( is1 )%x( 1 ) * tradial( 1 )
-     x( 2 ) = xs_3D( 2 ) + ray2D( is1 )%x( 1 ) * tradial( 2 )
-     x( 3 ) = ray2D( is1 )%x( 2 )
-     t_o( 1 ) = ray2D( is1 )%t( 1 ) * tradial( 1 )
-     t_o( 2 ) = ray2D( is1 )%t( 1 ) * tradial( 2 )
-     t_o( 3 ) = ray2D( is1 )%t( 2 )
+     x = RayToOceanX( ray2D( is1 )%x, xs_3D, tradial )
+     t_o = RayToOceanT( ray2D( is1 )%t, tradial )
      
      IF ( flipTopDiag ) Top_tridiag_pos = .NOT. Top_tridiag_pos
      IF ( flipBotDiag ) Bot_tridiag_pos = .NOT. Bot_tridiag_pos
@@ -574,9 +568,7 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
         IF ( atiType == 'C' ) THEN
 
            ! LP: This is superfluous, it's the same x calculated above.
-           x = [ xs_3D( 1 ) + ray2D( is + 1 )%x( 1 ) * tradial( 1 ),   &
-                 xs_3D( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
-                              ray2D( is + 1 )%x( 2 ) ]
+           x = RayToOceanX( ray2D( is + 1 )%x, xs_3D, tradial )
 
            s1     = ( x( 1 ) - Topx( 1 ) ) / ( xTopSeg( 2 ) - xTopSeg( 1 ) )   ! proportional distance along segment
            s2     = ( x( 2 ) - Topx( 2 ) ) / ( yTopSeg( 2 ) - yTopSeg( 1 ) )   ! proportional distance along segment
@@ -606,9 +598,7 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
         CALL Reflect2D( is, Bdry%Top%HS, 'TOP', TopnInt, z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy, RTop, NTopPTS, tradial)
         ray2D( is + 1 )%NumTopBnc = ray2D( is )%NumTopBnc + 1
 
-        x = [ xs_3D( 1 ) + ray2D( is + 1 )%x( 1 ) * tradial( 1 ),   &
-              xs_3D( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
-                           ray2D( is + 1 )%x( 2 ) ]
+        x = RayToOceanX( ray2D( is + 1 )%x, xs_3D, tradial )
 
         CALL Distances3D( x, Topx, Botx, Topn, Botn, DistEndTop, DistEndBot )
 
@@ -618,9 +608,7 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
         ! write( *, * ) 'Distances', DistEndTop, DistEndBot
         IF ( btyType == 'C' ) THEN
 
-           x = [ xs_3D( 1 ) + ray2D( is + 1 )%x( 1 ) * tradial( 1 ),   &
-                 xs_3D( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
-                              ray2D( is + 1 )%x( 2 ) ]
+           x = RayToOceanX( ray2D( is + 1 )%x, xs_3D, tradial )
 
            s1     = ( x( 1 ) - Botx( 1 ) ) / ( xBotSeg( 2 ) - xBotSeg( 1 ) )   ! proportional distance along segment
            s2     = ( x( 2 ) - Botx( 2 ) ) / ( yBotSeg( 2 ) - yBotSeg( 1 ) )   ! proportional distance along segment
@@ -650,9 +638,7 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
         CALL Reflect2D( is, Bdry%Bot%HS, 'BOT', BotnInt, z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy, RBot, NBotPTS, tradial)
         ray2D( is + 1 )%NumBotBnc = ray2D( is )%NumBotBnc + 1
 
-        x = [ xs_3D( 1 ) + ray2D( is + 1 )%x( 1 ) * tradial( 1 ),   &
-              xs_3D( 2 ) + ray2D( is + 1 )%x( 1 ) * tradial( 2 ),   &
-                           ray2D( is + 1 )%x( 2 ) ]
+        x = RayToOceanX( ray2D( is + 1 )%x, xs_3D, tradial )
 
         CALL Distances3D( x, Topx, Botx, Topn, Botn, DistEndTop, DistEndBot )
 
@@ -660,17 +646,15 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
 
      ! Has the ray left the box, lost its energy, escaped the boundaries, or exceeded storage limit?
      ! LP: See explanation for changes in bdry3DMod: GetTopSeg3D.
-     t_o( 1 ) = ray2D( is + 1 )%t( 1 ) * tradial( 1 )
-     t_o( 2 ) = ray2D( is + 1 )%t( 1 ) * tradial( 2 )
-     t_o( 3 ) = ray2D( is + 1 )%t( 2 )
+     t_o = RayToOceanT( ray2D( is + 1 )%t, tradial )
      term_minx = MAX( Bot( 1,            1 )%x( 1 ), Top( 1,            1 )%x( 1 ) )
      term_miny = MAX( Bot( 1,            1 )%x( 2 ), Top( 1,            1 )%x( 2 ) )
      term_maxx = MIN( Bot( NBTYPts( 1 ), 1 )%x( 1 ), Top( NATIPts( 1 ), 1 )%x( 1 ) )
      term_maxy = MIN( Bot( 1, NBTYPts( 2 ) )%x( 2 ), Top( 1, NATIPts( 2 ) )%x( 2 ) )
-     !!!IF ( ABS( x( 1 ) - xs( 1 ) ) > Beam%Box%x .OR. &
-     !!!     ABS( x( 2 ) - xs( 2 ) ) > Beam%Box%y .OR. &
-     !!!     ABS( x( 3 )           ) > Beam%Box%z .OR. &  ! LP: Removed xs( 3 ) for consistency
-     IF( &
+     ! LP: The Beam%Box conditions were inexplicably commented out in 2022 revision of Nx2D, see README.
+     IF ( ABS( x( 1 ) - xs_3D( 1 ) ) > Beam%Box%x .OR. &
+          ABS( x( 2 ) - xs_3D( 2 ) ) > Beam%Box%y .OR. &
+          ABS( x( 3 )              ) > Beam%Box%z .OR. &  ! LP: Removed xs( 3 ) for consistency
           x( 1 ) < term_minx .OR. &
           x( 2 ) < term_miny .OR. &
           x( 1 ) > term_maxx .OR. &
@@ -715,9 +699,9 @@ SUBROUTINE Step2D( ray0, ray2, tradial )
   REAL     (KIND=8 ) :: gradc0( 2 ), gradc1( 2 ), gradc2( 2 ), rho, &
                         c0, cimag0, crr0, crz0, czz0, csq0, cnn0_csq0, &
                         c1, cimag1, crr1, crz1, czz1, csq1, cnn1_csq1, &
-                        c2, cimag2, crr2, crz2, czz2, urayt0( 2 ), urayt1( 2 ), &
+                        c2, cimag2, crr2, crz2, czz2, urayt0( 2 ), urayt1( 2 ), urayt2( 2 ), &
                         h, halfh, hw0, hw1, ray2n( 2 ), RM, RN, gradcjump( 2 ), cnjump, csjump, w0, w1, &
-                        rayx3D( 3 ), rayt3D( 3 ) 
+                        rayx3D( 3 ), rayt3D( 3 ), x2_o( 3 )
 
   ! The numerical integrator used here is a version of the polygon (a.k.a. midpoint, leapfrog, or Box method), and similar
   ! to the Heun (second order Runge-Kutta method).
@@ -737,8 +721,8 @@ SUBROUTINE Step2D( ray0, ray2, tradial )
   h = Beam%deltas            ! initially set the step h, to the basic one, deltas
 
   urayt0 = c0 * ray0%t  ! unit tangent
-  rayx3D = [ xs_3D( 1 ) + ray0%x( 1 ) * tradial( 1 ), xs_3D( 2 ) + ray0%x( 1 ) * tradial( 2 ), ray0%x( 2 ) ]
-  rayt3D = [              urayt0( 1 ) * tradial( 1 ),              urayt0( 1 ) * tradial( 2 ), urayt0( 2 ) ]
+  rayx3D = RayToOceanX( ray0%x, xs_3D, tradial )
+  rayt3D = RayToOceanT( urayt0, tradial )
 
   CALL ReduceStep3D( rayx3D, rayt3D, iSegx0, iSegy0, iSegz0, h ) ! reduce h to land on boundary
 
@@ -761,17 +745,24 @@ SUBROUTINE Step2D( ray0, ray2, tradial )
   ! A modified Heun or Box method could also work.
 
   urayt1 = c1 * ray1%t   ! unit tangent
-  rayt3D = [           urayt1( 1 ) * tradial( 1 ),           urayt1( 1 ) * tradial( 2 ), urayt1( 2 ) ]
+  rayt3D = RayToOceanT( urayt1, tradial )
 
   CALL ReduceStep3D( rayx3D, rayt3D, iSegx0, iSegy0, iSegz0, h ) ! reduce h to land on boundary
 
   ! use blend of f' based on proportion of a full step used.
   w1  = h / ( 2.0d0 * halfh )
   w0  = 1.0d0 - w1
+  urayt2 = w0 * urayt0 + w1 * urayt1
+  ! Take the blended ray tangent ( urayt2 ) and find the minimum step size ( h )
+  ! to put this on a boundary, and ensure that the resulting position
+  ! ( ray2%x ) gets put precisely on the boundary.
+  CALL StepToBdry3D( rayx3D, x2_o, urayt2, iSegx0, iSegy0, iSegz0, h, &
+     topRefl, botRefl, flipTopDiag, flipBotDiag )
+  ray2%x = OceanToRayX( x2_o, xs_3D, tradial, urayt2 )
+  !write( *, * ) 'final coord ', x2_o, ray2%x, w0, w1
+  
   hw0 = h * w0
   hw1 = h * w1
-
-  ray2%x   = ray0%x   + hw0 * c0 * ray0%t        + hw1 * c1 * ray1%t
   ray2%t   = ray0%t   - hw0 * gradc0 / csq0      - hw1 * gradc1 / csq1
   ray2%p   = ray0%p   - hw0 * cnn0_csq0 * ray0%q - hw1 * cnn1_csq1 * ray1%q
   ray2%q   = ray0%q   + hw0 * c0        * ray0%p + hw1 * c1        * ray1%p
@@ -803,6 +794,62 @@ SUBROUTINE Step2D( ray0, ray2, tradial )
   END IF
 
 END SUBROUTINE Step2D
+
+FUNCTION RayToOceanX( x, xs, tradial )
+  REAL ( KIND=8 ) :: RayToOceanX( 3 )
+  REAL ( KIND=8 ), INTENT( IN ) :: x( 2 ), xs( 3 ), tradial( 2 )
+  RayToOceanX = [ xs( 1 ) + x( 1 ) * tradial( 1 ), &
+                  xs( 2 ) + x( 1 ) * tradial( 2 ), &
+                  x( 2 ) ]
+END FUNCTION
+
+FUNCTION RayToOceanT( t, tradial )
+  REAL ( KIND=8 ) :: RayToOceanT( 3 )
+  REAL ( KIND=8 ), INTENT( IN  ) :: t( 2 ), tradial( 2 )
+  RayToOceanT = [ t( 1 ) * tradial( 1 ), &
+                  t( 1 ) * tradial( 2 ), &
+                  t( 2 ) ]
+END FUNCTION
+
+FUNCTION OceanToRayX( x, xs, tradial, t )
+  REAL ( KIND=8 ) :: OceanToRayX( 2 )
+  REAL ( KIND=8 ), INTENT( IN ) :: x( 3 ), xs( 3 ), tradial( 2 ), t( 2 )
+  REAL ( KIND=8 ) :: x_orig( 2 ), x_res( 3 ), x_try( 2 ), x_res2( 3 )
+  ! LP: Going back and forth through the coordinate transform won't
+  ! always keep the precise value, so we may have to finesse the floats.
+  x_orig( 2 ) = x( 3 )
+  IF ( ABS( tradial( 1 ) ) >= ABS( tradial( 2 ) ) ) THEN
+     x_orig( 1 ) = ( x( 1 ) - xs( 1 ) ) / tradial( 1 )
+  ELSE
+     x_orig( 1 ) = ( x( 2 ) - xs( 2 ) ) / tradial( 2 )
+  END IF
+  x_res = RayToOceanX( x_orig, xs, tradial )
+  IF ( ALL( x_res == x ) ) THEN
+     ! Got lucky--it went through and came back with the same values.
+     OceanToRayX = x_orig
+     RETURN
+  END IF
+  ! Try adding or subtracting one ulp.
+  x_try = x_orig
+  x_try( 1 ) = NEAREST( x_orig( 1 ), 1.0D0 )
+  x_res2 = RayToOceanX( x_try, xs, tradial )
+  IF ( ALL( x_res2 == x ) ) THEN
+     OceanToRayX = x_try
+     RETURN
+  END IF
+  x_try( 1 ) = NEAREST( x_orig( 1 ), -1.0D0 )
+  x_res2 = RayToOceanX( x_try, xs, tradial )
+  IF ( ALL( x_res2 == x ) ) THEN
+     OceanToRayX = x_try
+     RETURN
+  END IF
+  ! No hope of being exact. Just try to be slightly forward of the boundary.
+  x_try( 1 ) = x_orig( 1 ) + 1.0D-6 * t( 1 )
+  IF ( x_try( 1 ) == x_orig( 1 ) ) THEN
+     x_try( 1 ) = x_orig( 1 ) + 1.0D-3 * t( 1 )
+  END IF
+  OceanToRayX = x_try
+END FUNCTION
 
 !**********************************************************************!
 

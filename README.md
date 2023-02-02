@@ -6,9 +6,9 @@ BELLHOP/BELLHOP3D: `bellhopcxx`/`bellhopcuda`](https://github.com/A-New-BellHope
 
 ### Impressum
 
-Copyright (C) 2021-2022 The Regents of the University of California \
+Copyright (C) 2021-2023 The Regents of the University of California \
 c/o Jules Jaffe team at SIO / UCSD, jjaffe@ucsd.edu \
-Copyright (C) 1983-2020 Michael B. Porter
+Copyright (C) 1983-2022 Michael B. Porter
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -311,6 +311,17 @@ correction (`R1`, `R2`, and `R3` are all zero), rotating `p` into and out of the
 ray's coordinate system introduces slight floating-point error, which
 accumulates over every step and can trigger edge case differences later. This
 has been improved by keeping `p` constant when there is no curvature correction.
+
+### Missing ray termination due to beam box in Nx2D
+
+In `TraceRay2D` (Nx2D), the conditions comparing the ray position to the beam
+box were inexplicably commented out in the 2022 revision. These conditions are
+active in 2D and 3D. The result of running a ray without these conditions is
+that when it gets to the boundary of the beam box, the step size is reduced to
+zero and then forced to a small number. The ray takes 50 of these small steps
+(millimeters over the boundary) and then terminates due to `iSmallStepCtr`. This
+behavior is not useful compared to just ending at the boundary, so the
+conditions have been restored.
 
 ### Intentional asymmetry between X and Y crossing thresholds
 

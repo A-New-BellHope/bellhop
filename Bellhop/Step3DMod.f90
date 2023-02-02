@@ -448,7 +448,8 @@ CONTAINS
     
     h = MIN( h, hInt, hBoxx, hBoxy, hBoxz, hTop, hBot, hxSeg, hySeg, hTopDiag, hBotDiag )  ! take limit set by shortest distance to a crossing
     IF ( h < -1d-4 ) THEN
-       CALL ERROUT( 'ReduceStep3D', 'negative h' )
+       WRITE( PRTFile, * ) 'Warning: negative h'
+       ! CALL ERROUT( 'ReduceStep3D', 'negative h' )
     END IF
     IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN        ! is it taking an infinitesimal step?
        h = INFINITESIMAL_STEP_SIZE * Beam%deltas                 ! make sure we make some motion
