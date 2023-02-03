@@ -500,7 +500,7 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
   REAL     (KIND=8) :: tinit( 2 ), tradial( 2 ), BotnInt( 3 ), TopnInt( 3 ), s1, s2
   REAL     (KIND=8) :: z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy
   REAL     (KIND=8) :: term_minx, term_miny, term_maxx, term_maxy
-  LOGICAL           :: flipTopDiag, flipBotDiag
+  LOGICAL           :: topRefl, botRefl, flipTopDiag, flipBotDiag
 
   ! *** Initial conditions ***
 
@@ -540,7 +540,7 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
      is  = is + 1
      is1 = is + 1
 
-     CALL Step2D( ray2D( is ), ray2D( is1 ), tradial )
+     CALL Step2D( ray2D( is ), ray2D( is1 ), tradial, topRefl, botRefl, flipTopDiag, flipBotDiag )
 
      ! convert polar coordinate of ray to x-y coordinate
      x = RayToOceanX( ray2D( is1 )%x, xs_3D, tradial )
@@ -564,7 +564,7 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
   
      CALL Distances3D( x, Topx, Botx, Topn, Botn, DistEndTop, DistEndBot )
 
-     IF      ( DistBegTop > 0.0d0 .AND. DistEndTop <= 0.0d0 ) THEN  ! test top reflection
+     IF ( topRefl ) THEN
         IF ( atiType == 'C' ) THEN
 
            ! LP: This is superfluous, it's the same x calculated above.
@@ -602,7 +602,7 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
 
         CALL Distances3D( x, Topx, Botx, Topn, Botn, DistEndTop, DistEndBot )
 
-     ELSE IF ( DistBegBot > 0.0d0 .AND. DistEndBot <= 0.0d0 ) THEN  ! test bottom reflection
+     ELSE IF ( botRefl ) THEN
         ! write( *, * ) 'Reflecting', x, Botx
         ! write( *, * ) 'Botn', Botn
         ! write( *, * ) 'Distances', DistEndTop, DistEndBot
@@ -652,9 +652,9 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
      term_maxx = MIN( Bot( NBTYPts( 1 ), 1 )%x( 1 ), Top( NATIPts( 1 ), 1 )%x( 1 ) )
      term_maxy = MIN( Bot( 1, NBTYPts( 2 ) )%x( 2 ), Top( 1, NATIPts( 2 ) )%x( 2 ) )
      ! LP: The Beam%Box conditions were inexplicably commented out in 2022 revision of Nx2D, see README.
-     IF ( ABS( x( 1 ) - xs_3D( 1 ) ) > Beam%Box%x .OR. &
-          ABS( x( 2 ) - xs_3D( 2 ) ) > Beam%Box%y .OR. &
-          ABS( x( 3 )              ) > Beam%Box%z .OR. &  ! LP: Removed xs( 3 ) for consistency
+     IF ( ABS( x( 1 ) - xs_3D( 1 ) ) >= Beam%Box%x .OR. &
+          ABS( x( 2 ) - xs_3D( 2 ) ) >= Beam%Box%y .OR. &
+          ABS( x( 3 )              ) >= Beam%Box%z .OR. &  ! LP: Removed xs( 3 ) for consistency
           x( 1 ) < term_minx .OR. &
           x( 2 ) < term_miny .OR. &
           x( 1 ) > term_maxx .OR. &
@@ -684,7 +684,7 @@ END SUBROUTINE TraceRay2D
 
 ! **********************************************************************!
 
-SUBROUTINE Step2D( ray0, ray2, tradial )
+SUBROUTINE Step2D( ray0, ray2, tradial, topRefl, botRefl, flipTopDiag, flipBotDiag )
 
   ! Does a single step along the ray
   ! x denotes the ray coordinate, (r,z)
@@ -694,6 +694,7 @@ SUBROUTINE Step2D( ray0, ray2, tradial )
   USE Step3DMod
 
   REAL (KIND=8), INTENT( IN ) :: tradial( 2 )   ! coordinate of source and ray bearing angle
+  LOGICAL, INTENT( OUT ) :: topRefl, botRefl, flipTopDiag, flipBotDiag
   TYPE( ray2DPt )    :: ray0, ray1, ray2
   INTEGER            :: iSegx0, iSegy0, iSegz0
   REAL     (KIND=8 ) :: gradc0( 2 ), gradc1( 2 ), gradc2( 2 ), rho, &
@@ -701,7 +702,7 @@ SUBROUTINE Step2D( ray0, ray2, tradial )
                         c1, cimag1, crr1, crz1, czz1, csq1, cnn1_csq1, &
                         c2, cimag2, crr2, crz2, czz2, urayt0( 2 ), urayt1( 2 ), urayt2( 2 ), &
                         h, halfh, hw0, hw1, ray2n( 2 ), RM, RN, gradcjump( 2 ), cnjump, csjump, w0, w1, &
-                        rayx3D( 3 ), rayt3D( 3 ), x2_o( 3 )
+                        rayx3D( 3 ), rayt3D( 3 ), x2_o( 3 ), x2_o_out( 3 )
 
   ! The numerical integrator used here is a version of the polygon (a.k.a. midpoint, leapfrog, or Box method), and similar
   ! to the Heun (second order Runge-Kutta method).
@@ -753,12 +754,19 @@ SUBROUTINE Step2D( ray0, ray2, tradial )
   w1  = h / ( 2.0d0 * halfh )
   w0  = 1.0d0 - w1
   urayt2 = w0 * urayt0 + w1 * urayt1
+  rayt3D = RayToOceanT( urayt2, tradial )
   ! Take the blended ray tangent ( urayt2 ) and find the minimum step size ( h )
   ! to put this on a boundary, and ensure that the resulting position
   ! ( ray2%x ) gets put precisely on the boundary.
-  CALL StepToBdry3D( rayx3D, x2_o, urayt2, iSegx0, iSegy0, iSegz0, h, &
+  CALL StepToBdry3D( rayx3D, x2_o, rayt3D, iSegx0, iSegy0, iSegz0, h, &
      topRefl, botRefl, flipTopDiag, flipBotDiag )
   ray2%x = OceanToRayX( x2_o, xs_3D, tradial, urayt2 )
+  IF ( STEP_DEBUGGING ) THEN
+     x2_o_out = RayToOceanX( ray2%x, xs_3D, tradial )
+     WRITE( PRTFile, * ) 'OceanToRayX in ', x2_o
+     WRITE( PRTFile, * ) '           ==> ', ray2%x
+     WRITE( PRTFile, * ) '           ==> ', x2_o_out
+  END IF
   !write( *, * ) 'final coord ', x2_o, ray2%x, w0, w1
   
   hw0 = h * w0
@@ -1023,9 +1031,9 @@ SUBROUTINE TraceRay3D( alpha, beta, epsilon, Amp0 )
      term_maxx = MIN( Bot( NBTYPts( 1 ), 1 )%x( 1 ), Top( NATIPts( 1 ), 1 )%x( 1 ) )
      term_maxy = MIN( Bot( 1, NBTYPts( 2 ) )%x( 2 ), Top( 1, NATIPts( 2 ) )%x( 2 ) )
      IF ( &
-          ABS( term_x( 1 ) - xs_3D( 1 ) ) > Beam%Box%x .OR. &
-          ABS( term_x( 2 ) - xs_3D( 2 ) ) > Beam%Box%y .OR. &
-          ABS( term_x( 3 )              ) > Beam%Box%z .OR. & ! box is centered at z=0
+          ABS( term_x( 1 ) - xs_3D( 1 ) ) >= Beam%Box%x .OR. &
+          ABS( term_x( 2 ) - xs_3D( 2 ) ) >= Beam%Box%y .OR. &
+          ABS( term_x( 3 )              ) >= Beam%Box%z .OR. & ! box is centered at z=0
           term_x( 1 ) < term_minx .OR. &
           term_x( 2 ) < term_miny .OR. &
           term_x( 1 ) > term_maxx .OR. &

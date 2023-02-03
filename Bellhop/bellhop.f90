@@ -589,8 +589,8 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
      ! Has the ray left the box, lost its energy, escaped the boundaries, or exceeded storage limit?
      ! There is a test here for when two adjacent ray points are outside the boundaries
      ! BELLHOP3D handles this differently using a counter-limit for really small steps.
-     IF ( ABS( ray2D( is + 1 )%x( 1 ) ) > Beam%Box%r .OR. &
-          ABS( ray2D( is + 1 )%x( 2 ) ) > Beam%Box%z .OR. ray2D( is + 1 )%Amp < 0.005 .OR. &
+     IF ( ABS( ray2D( is + 1 )%x( 1 ) ) >= Beam%Box%r .OR. &
+          ABS( ray2D( is + 1 )%x( 2 ) ) >= Beam%Box%z .OR. ray2D( is + 1 )%Amp < 0.005 .OR. &
           ( DistBegTop < 0.0 .AND. DistEndTop < 0.0 ) .OR. &
           ( DistBegBot < 0.0 .AND. DistEndBot < 0.0 ) ) THEN
           ! ray2D( is + 1 )%t( 1 ) < 0 ) THEN ! this last test kills off a backward traveling ray

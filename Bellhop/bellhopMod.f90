@@ -2,6 +2,7 @@ MODULE bellhopMod
 
   USE MathConstants
   INTEGER, PARAMETER :: ENVFile = 5, PRTFile = 6, RAYFile = 21, SHDFile = 25, ARRFile = 36, SSPFile = 40, MaxN = 100000
+  LOGICAL, PARAMETER :: STEP_DEBUGGING = .FALSE.
 
   ! Reduce MaxN (= max # of steps along a ray) to reduce storage
   ! Note space is wasted in NumTopBnc, NumBotBnc ...
