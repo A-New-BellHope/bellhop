@@ -483,11 +483,18 @@ CONTAINS
                 x_rcvr( 2, 1 : NRz_per_range ) = Pos%Rz( 1 : NRz_per_range )   ! rectilinear grid
              END IF
 
+             ! WRITE( PRTFile, * ) 'Step ir', is-2, ir-1
+
              RcvrDepths: DO iz = 1, NRz_per_range
                 IF ( x_rcvr( 2, iz ) < zmin .OR. x_rcvr( 2, iz ) > zmax ) CYCLE RcvrDepths
 
                 s         =      DOT_PRODUCT( x_rcvr( :, iz ) - x_ray, rayt ) / rlen ! proportional distance along ray
                 n         = ABS( DOT_PRODUCT( x_rcvr( :, iz ) - x_ray, rayn ) )      ! normal distance to ray
+                
+                IF ( ir-1 == 20 ) THEN
+                   WRITE( PRTFile, * ) 'is ir iz s n', is-2, ir-1, iz-1, s, n
+                END IF
+                
                 q         = ray2D( iS - 1 )%q( 1 ) + s * dqds               ! interpolated amplitude
                 RadiusMax = ABS( q / q0 )                                   ! beam radius
 
@@ -654,6 +661,7 @@ CONTAINS
   
   SUBROUTINE ApplyContribution( U )
     COMPLEX, INTENT( INOUT ) :: U
+    COMPLEX ( KIND=4 ) :: dfield
     
     SELECT CASE( Beam%RunType( 1 : 1 ) )
     CASE ( 'E' )                ! eigenrays
@@ -665,7 +673,9 @@ CONTAINS
     CASE ( 'A', 'a' )           ! arrivals
        CALL AddArr( omega, iz, ir, Amp, phaseInt, delay, SrcDeclAngle, RcvrDeclAngle, ray2D( iS )%NumTopBnc, ray2D( iS )%NumBotBnc )
     CASE ( 'C' )                ! coherent TL
-       U = U + CMPLX( Amp * EXP( -i * ( omega * delay - phaseInt ) ) )
+       dfield = CMPLX( Amp * EXP( -i * ( omega * delay - phaseInt ) ) )
+       ! WRITE( PRTFile, * ) 'ApplyContribution dfield', dfield
+       U = U + dfield
                      ! omega * n * n / ( 2 * ray2d( iS )%c**2 * delay ) ) ) )   ! curvature correction
     CASE DEFAULT                ! incoherent/semicoherent TL
        IF ( Beam%Type( 1 : 1 ) == 'B' ) THEN   ! Gaussian beam

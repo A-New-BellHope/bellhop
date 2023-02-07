@@ -703,6 +703,12 @@ SUBROUTINE Step2D( ray0, ray2, tradial, topRefl, botRefl, flipTopDiag, flipBotDi
                         c2, cimag2, crr2, crz2, czz2, urayt0( 2 ), urayt1( 2 ), urayt2( 2 ), &
                         h, halfh, hw0, hw1, ray2n( 2 ), RM, RN, gradcjump( 2 ), cnjump, csjump, w0, w1, &
                         rayx3D( 3 ), rayt3D( 3 ), x2_o( 3 ), x2_o_out( 3 )
+                        
+  IF ( STEP_DEBUGGING ) THEN
+     WRITE( PRTFile, * )
+     WRITE( PRTFile, * ) 'ray0 x t', ray0%x, ray0%t
+     WRITE( PRTFile, * ) 'iSegr iSegz', iSegr, iSegz
+  END IF
 
   ! The numerical integrator used here is a version of the polygon (a.k.a. midpoint, leapfrog, or Box method), and similar
   ! to the Heun (second order Runge-Kutta method).
