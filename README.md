@@ -517,7 +517,11 @@ condition is still written. If a ray stops after a step to a certain boundary,
 whether receivers on that boundary are considered for TL / eigenrays / arrivals
 is determined by whether the ray is behind or ahead of that boundary. Of course,
 since environment files use round numbers, receivers being exactly on boundaries
-is very common! This can substantially change the receiver outputs.
+is very common! This can substantially change the receiver outputs. Even for
+steps in the middle of rays, another mechanism which can amplify errors is
+whether the step before a boundary or the step after that boundary influences
+receivers which are on that boundary, as those two steps generally have
+different slopes and would influence the receiver slightly differently.
 
 Second, error can accumulate just due to the integration, even without any of
 the "hard edge" cases discussed next. A small error in the initial trajectory
@@ -551,27 +555,45 @@ hit it in the C++/CUDA version, the relative error is 100%; but even worse, if
 the ray does not hit the receiver in the Fortran version but does hit it in the
 C++/CUDA version, the relative error is *infinite*!
 
+There is one more way a small error in a variable can result in a large change
+in the field. The equation for computing coherent influence involves the term
+`EXP( -i * ( omega * delay - phaseInt ) )`. For a typical frequency of 50 Hz,
+`omega = 314.159`. This means that tiny errors in the delay can completely
+change the phase of the output. For example, in one case we looked at in detail,
+the delay was `32.473` instead of `32.467`, an error of about 0.01%. This
+shifted the phase by about a quadrant, causing the final results at this
+receiver to be unrecognizable compared to the original.
+
 ### Fix for boundary stepping inconsistency
 
 There is no one fix for all of these circumstances, but a fix has been
 implemented which generally solves the inconsistency about which side of a
 boundary a step is to. First, a function `StepToBdry2D`/`3D` is added which
 corresponds to `ReduceStep2D`/`3D`. This function ensures that after the step,
-the resulting position is *exactly* on the boundary (and if the value is not
+the resulting position is *exactly* on the boundary--and if the value is not
 precisely representable in floating-point, that it is the same value as already
-stored in memory for the boundary). Second, the functions which update which
+stored in memory for the boundary. Second, the functions which update which
 segment a position is in have been changed to use the ray tangent to resolve
 edge cases, instead of choosing between less-than-or-equal-to versus less-than
 and such. The ray is always placed into the later segment: the segment such that
 it can move forward a nontrival distance and remain in the same segment. The
 idea is, since every step must be an edge case, it is put *exactly* on the edge,
 and then that exactly-on-the-edge position is handled in a consistent manner.
+
 This gets more complicated for crossing the diagonals in 3D, as the boundary
 is not a single fixed floating-point value from an environment file. In this
 case, flags `Top_tridiag_pos` and `Bot_tridiag_pos` are used to store which side
 of the boundary the ray is on while its position is nearly on top of the
 boundary. The behavior is still to step to the boundary and then be on the
 boundary but in the other side.
+
+Things are even worse for Nx2D, where a 2D ray has to step to 3D boundaries, in
+a way that survives a transformation to 2D and then back to 3D. A system
+(`OceanToRayX`) was put in place which attempts to step to the exact value, and
+if that fails, at least steps to the correct (next) side of the 3D boundary.
+However, this does not reduce divergence between cases, as one case may be able
+to snap to the exact boundary and another may not, due to infinitesimal
+differences in the input values.
 
 ### Case study: missing iSegz, iSegr initialization
 

@@ -483,18 +483,11 @@ CONTAINS
                 x_rcvr( 2, 1 : NRz_per_range ) = Pos%Rz( 1 : NRz_per_range )   ! rectilinear grid
              END IF
 
-             ! WRITE( PRTFile, * ) 'Step ir', is-2, ir-1
-
              RcvrDepths: DO iz = 1, NRz_per_range
                 IF ( x_rcvr( 2, iz ) < zmin .OR. x_rcvr( 2, iz ) > zmax ) CYCLE RcvrDepths
 
                 s         =      DOT_PRODUCT( x_rcvr( :, iz ) - x_ray, rayt ) / rlen ! proportional distance along ray
                 n         = ABS( DOT_PRODUCT( x_rcvr( :, iz ) - x_ray, rayn ) )      ! normal distance to ray
-                
-                IF ( ir-1 == 20 ) THEN
-                   WRITE( PRTFile, * ) 'is ir iz s n', is-2, ir-1, iz-1, s, n
-                END IF
-                
                 q         = ray2D( iS - 1 )%q( 1 ) + s * dqds               ! interpolated amplitude
                 RadiusMax = ABS( q / q0 )                                   ! beam radius
 
