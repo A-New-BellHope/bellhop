@@ -696,7 +696,7 @@ SUBROUTINE Step2D( ray0, ray2, tradial, topRefl, botRefl, flipTopDiag, flipBotDi
   REAL (KIND=8), INTENT( IN ) :: tradial( 2 )   ! coordinate of source and ray bearing angle
   LOGICAL, INTENT( OUT ) :: topRefl, botRefl, flipTopDiag, flipBotDiag
   TYPE( ray2DPt )    :: ray0, ray1, ray2
-  INTEGER            :: iSegx0, iSegy0, iSegz0
+  INTEGER            :: iSegx0, iSegy0, iSegz0, snapDim
   REAL     (KIND=8 ) :: gradc0( 2 ), gradc1( 2 ), gradc2( 2 ), rho, &
                         c0, cimag0, crr0, crz0, czz0, csq0, cnn0_csq0, &
                         c1, cimag1, crr1, crz1, czz1, csq1, cnn1_csq1, &
@@ -765,8 +765,8 @@ SUBROUTINE Step2D( ray0, ray2, tradial, topRefl, botRefl, flipTopDiag, flipBotDi
   ! to put this on a boundary, and ensure that the resulting position
   ! ( ray2%x ) gets put precisely on the boundary.
   CALL StepToBdry3D( rayx3D, x2_o, rayt3D, iSegx0, iSegy0, iSegz0, h, &
-     topRefl, botRefl, flipTopDiag, flipBotDiag )
-  ray2%x = OceanToRayX( x2_o, xs_3D, tradial, urayt2 )
+     topRefl, botRefl, flipTopDiag, flipBotDiag, snapDim )
+  ray2%x = OceanToRayX( x2_o, xs_3D, tradial, urayt2, snapDim )
   IF ( STEP_DEBUGGING ) THEN
      x2_o_out = RayToOceanX( ray2%x, xs_3D, tradial )
      WRITE( PRTFile, * ) 'OceanToRayX in ', x2_o
@@ -825,44 +825,69 @@ FUNCTION RayToOceanT( t, tradial )
                   t( 2 ) ]
 END FUNCTION
 
-FUNCTION OceanToRayX( x, xs, tradial, t )
-  REAL ( KIND=8 ) :: OceanToRayX( 2 )
-  REAL ( KIND=8 ), INTENT( IN ) :: x( 3 ), xs( 3 ), tradial( 2 ), t( 2 )
-  REAL ( KIND=8 ) :: x_orig( 2 ), x_res( 3 ), x_try( 2 ), x_res2( 3 )
+FUNCTION OceanToRayX( x, xs, tradial, t, snapDim )
+  
   ! LP: Going back and forth through the coordinate transform won't
   ! always keep the precise value, so we may have to finesse the floats.
-  x_orig( 2 ) = x( 3 )
+  ! Valid values of snapDim:
+  ! -2: Snap to X or Y unspecified
+  ! -1: No snap
+  !  0: Snap to X
+  !  1: Snap to Y
+  !  2: Snap to Z
+  
+  REAL ( KIND=8 ) :: OceanToRayX( 2 )
+  REAL ( KIND=8 ), INTENT( IN ) :: x( 3 ), xs( 3 ), tradial( 2 ), t( 2 )
+  INTEGER, INTENT( IN ) :: snapDim
+  REAL ( KIND=8 ) :: ret( 2 ), x_back( 3 ), wantdir( 2 ), errdir( 2 )
+  LOGICAL :: correctdir( 2 )
+  INTEGER :: i
+  
+  ! Depth always transfers perfectly--not changed.
+  ret( 2 ) = x( 3 )
+  ! For range, use larger dimension--this avoids divide-by-zero or divide
+  ! by a small number causing accuracy problems.
   IF ( ABS( tradial( 1 ) ) >= ABS( tradial( 2 ) ) ) THEN
-     x_orig( 1 ) = ( x( 1 ) - xs( 1 ) ) / tradial( 1 )
+     ret( 1 ) = ( x( 1 ) - xs( 1 ) ) / tradial( 1 )
   ELSE
-     x_orig( 1 ) = ( x( 2 ) - xs( 2 ) ) / tradial( 2 )
+     ret( 1 ) = ( x( 2 ) - xs( 2 ) ) / tradial( 2 )
   END IF
-  x_res = RayToOceanX( x_orig, xs, tradial )
-  IF ( ALL( x_res == x ) ) THEN
-     ! Got lucky--it went through and came back with the same values.
-     OceanToRayX = x_orig
+  IF ( snapDim < -2 .OR. snapDim == -1 .OR. snapDim >= 2 ) THEN
+     ! Either:
+     ! snapDim out of range (won't happen, but want to help compiler)
+     ! No snap selected--this is the best estimate
+     ! Snap to Z--Z already perfect, this is the best estimate
+     OceanToRayX = ret
      RETURN
   END IF
-  ! Try adding or subtracting one ulp.
-  x_try = x_orig
-  x_try( 1 ) = NEAREST( x_orig( 1 ), 1.0D0 )
-  x_res2 = RayToOceanX( x_try, xs, tradial )
-  IF ( ALL( x_res2 == x ) ) THEN
-     OceanToRayX = x_try
-     RETURN
-  END IF
-  x_try( 1 ) = NEAREST( x_orig( 1 ), -1.0D0 )
-  x_res2 = RayToOceanX( x_try, xs, tradial )
-  IF ( ALL( x_res2 == x ) ) THEN
-     OceanToRayX = x_try
-     RETURN
-  END IF
-  ! No hope of being exact. Just try to be slightly forward of the boundary.
-  x_try( 1 ) = x_orig( 1 ) + 1.0D-6 * t( 1 )
-  IF ( x_try( 1 ) == x_orig( 1 ) ) THEN
-     x_try( 1 ) = x_orig( 1 ) + 1.0D-3 * t( 1 )
-  END IF
-  OceanToRayX = x_try
+  ! Only do this iteration a few times, then give up.
+  DO i = 1, 4
+     ! Go back from 2D to 3D, compare to original x.
+     x_back = RayToOceanX( ret, xs, tradial )
+     ! If we can't be on the boundary, we want to be slightly forward of
+     ! the boundary, measured in terms of the ray tangent range. This also
+     ! encompasses cases where one component exactly matches (errdir.x_or_y
+     ! == RL(0.0)). For both of these values, only the sign matters.
+     wantdir = tradial * t( 1 )
+     errdir = x_back( 1 : 2 ) - x( 1 : 2 )
+     correctdir = ( wantdir * errdir ) >= 0.0D0
+     IF ( ( snapDim == 0 .AND. correctdir( 1 ) ) .OR. &
+          ( snapDim == 1 .AND. correctdir( 2 ) ) .OR. &
+          ( correctdir( 1 ) .AND. correctdir( 2 ) ) ) THEN
+        OceanToRayX = ret
+        RETURN
+     END IF
+     ! Move to the next floating point value for ret, in the direction
+     ! of the ray tangent. How do we know this will actually produce a
+     ! new value for x_back? If the scale of the floating point steps
+     ! around x_back is larger than that of ret (several values of ret
+     ! map to the same value of x_back after the transform), there
+     ! should be no problem in finding a value that maps exactly, so
+     ! we would not get here.
+     ret( 1 ) = NEAREST( ret( 1 ), t( 1 ) )
+  END DO
+  WRITE( PRTFile, * ) 'Warning in OceanToRayX: Failed to transform 3D -> 2D -> 3D consistently'
+  OceanToRayX = ret
 END FUNCTION
 
 !**********************************************************************!

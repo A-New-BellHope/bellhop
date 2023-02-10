@@ -21,7 +21,7 @@ CONTAINS
     ! rays
     TYPE( ray3DPt ) :: ray0, ray1, ray2
     LOGICAL, INTENT( OUT ) :: topRefl, botRefl, flipTopDiag, flipBotDiag
-    INTEGER         :: iSegx0, iSegy0, iSegz0
+    INTEGER         :: iSegx0, iSegy0, iSegz0, snapDim
     REAL  (KIND=8 ) :: gradc0( 3 ), gradc1( 3 ), gradc2( 3 ), &
          c0, cimag0, csq0, cxx0, cyy0, czz0, cxy0, cxz0, cyz0, cnn0, cmn0, cmm0, &
          c1, cimag1, csq1, cxx1, cyy1, czz1, cxy1, cxz1, cyz1, cnn1, cmn1, cmm1, &
@@ -97,7 +97,7 @@ CONTAINS
     ! to put this on a boundary, and ensure that the resulting position
     ! ( ray2%x ) gets put precisely on the boundary.
     CALL StepToBdry3D( ray0%x, ray2%x, urayt2, iSegx0, iSegy0, iSegz0, h, &
-       topRefl, botRefl, flipTopDiag, flipBotDiag )
+       topRefl, botRefl, flipTopDiag, flipBotDiag, snapDim )
     !write( *, * ) 'final coord ', ray2%x, w0, w1
     
     ! Update other variables with this new h
@@ -461,12 +461,13 @@ CONTAINS
   ! **********************************************************************!
 
   SUBROUTINE StepToBdry3D( x0, x2, urayt, iSegx0, iSegy0, iSegz0, h, &
-    topRefl, botRefl, flipTopDiag, flipBotDiag )
+    topRefl, botRefl, flipTopDiag, flipBotDiag, snapDim )
 
     INTEGER,       INTENT( IN    ) :: iSegx0, iSegy0, iSegz0
     REAL (KIND=8), INTENT( IN    ) :: x0( 3 ), urayt( 3 )  ! ray coordinate and tangent
     REAL (KIND=8), INTENT( INOUT ) :: x2( 3 ), h           ! output coord, reduced step size
     LOGICAL,       INTENT( OUT   ) :: topRefl, botRefl, flipTopDiag, flipBotDiag
+    INTEGER,       INTENT( OUT   ) :: snapDim
     REAL (KIND=8) :: d( 3 ), d0( 3 ), tri_n( 3 )
     REAL (KIND=8) :: xSeg( 2 ), ySeg( 2 )                  ! boundary limits
     INTEGER                        :: k
@@ -475,6 +476,7 @@ CONTAINS
     ! Original step due to maximum step size
     h = Beam%deltas
     x2 = x0 + h * urayt
+    snapDim = -1
 
     ! interface crossing in depth
     IF ( ABS( urayt( 3 ) ) > EPSILON( h ) ) THEN
@@ -482,12 +484,14 @@ CONTAINS
           h  = ( SSP%z( iSegz0     ) - x0( 3 ) ) / urayt( 3 )
           x2 = x0 + h * urayt
           x2( 3 ) = SSP%z( iSegz0 )
+          snapDim = 2
           IF ( STEP_DEBUGGING ) &
              WRITE( PRTFile, * ) 'StepToBdry3D shallower h to', h, x2
        ELSE IF ( SSP%z( iSegz0 + 1 ) < x2( 3 ) .AND. iSegz0 + 1 < SSP%Nz ) THEN
           h  = ( SSP%z( iSegz0 + 1 ) - x0( 3 ) ) / urayt( 3 )
           x2 = x0 + h * urayt
           x2( 3 ) = SSP%z( iSegz0 + 1 )
+          snapDim = 2
           IF ( STEP_DEBUGGING ) &
              WRITE( PRTFile, * ) 'StepToBdry3D deeper h to', h, x2
        END IF
@@ -498,6 +502,7 @@ CONTAINS
        h = ( Beam%Box%x - ABS( ( x0( 1 ) - xs_3D( 1 ) ) ) ) / ABS( urayt( 1 ) )
        x2 = x0 + h * urayt
        x2( 1 ) = xs_3D( 1 ) + SIGN( Beam%Box%x, x0( 1 ) - xs_3D( 1 ) )
+       snapDim = 0
        IF ( STEP_DEBUGGING ) &
           WRITE( PRTFile, * ) 'StepToBdry3D beam box crossing X h to', h, x2
     END IF
@@ -505,6 +510,7 @@ CONTAINS
        h = ( Beam%Box%y - ABS( ( x0( 2 ) - xs_3D( 2 ) ) ) ) / ABS( urayt( 2 ) )
        x2 = x0 + h * urayt
        x2( 2 ) = xs_3D( 2 ) + SIGN( Beam%Box%y, x0( 2 ) - xs_3D( 2 ) )
+       snapDim = 1
        IF ( STEP_DEBUGGING ) &
           WRITE( PRTFile, * ) 'StepToBdry3D beam box crossing Y h to', h, x2
     END IF
@@ -512,6 +518,7 @@ CONTAINS
        h = ( Beam%Box%z - ABS(   x0( 3 )                ) ) / ABS( urayt( 3 ) )
        x2 = x0 + h * urayt
        x2( 3 ) =              SIGN( Beam%Box%z, x0( 3 )              )
+       snapDim = 2
        IF ( STEP_DEBUGGING ) &
           WRITE( PRTFile, * ) 'StepToBdry3D beam box crossing Y h to', h, x2
     END IF
@@ -530,6 +537,7 @@ CONTAINS
        IF ( ABS( Topn( 1 ) ) < EPSILON( Topn( 1 ) ) .AND. ABS( Topn( 2 ) ) < EPSILON( Topn( 2 ) ) ) THEN
           x2( 3 ) = Topx( 3 )
        END IF
+       snapDim = 2 ! Even if not flat, exactness in Z most important
        IF ( STEP_DEBUGGING ) &
           WRITE( PRTFile, * ) 'StepToBdry3D top crossing h to', h, x2
        topRefl = .TRUE.
@@ -548,6 +556,7 @@ CONTAINS
        IF ( ABS( Botn( 1 ) ) < EPSILON( Botn( 1 ) ) .AND. ABS( Botn( 2 ) ) < EPSILON( Botn( 2 ) ) ) THEN
           x2( 3 ) = Botx( 3 )
        END IF
+       snapDim = 2 ! Even if not flat, exactness in Z most important
        IF ( STEP_DEBUGGING ) &
           WRITE( PRTFile, * ) 'StepToBdry3D bottom crossing h to', h, x2
        botRefl = .TRUE.
@@ -572,6 +581,7 @@ CONTAINS
           h  = -( x0( 1 ) - xSeg( 1 ) ) / urayt( 1 )
           x2 = x0 + h * urayt
           x2( 1 ) = xSeg( 1 )
+          snapDim = 0
           topRefl = .FALSE.
           botRefl = .FALSE.
           IF ( STEP_DEBUGGING ) &
@@ -580,6 +590,7 @@ CONTAINS
           h  = -( x0( 1 ) - xSeg( 2 ) ) / urayt( 1 )
           x2 = x0 + h * urayt
           x2( 1 ) = xSeg( 2 )
+          snapDim = 0
           topRefl = .FALSE.
           botRefl = .FALSE.
           IF ( STEP_DEBUGGING ) &
@@ -602,6 +613,7 @@ CONTAINS
           h  = -( x0( 2 ) - ySeg( 1 ) ) / urayt( 2 )
           x2 = x0 + h * urayt
           x2( 2 ) = ySeg( 1 )
+          snapDim = 1
           topRefl = .FALSE.
           botRefl = .FALSE.
           IF ( STEP_DEBUGGING ) &
@@ -610,6 +622,7 @@ CONTAINS
           h  = -( x0( 2 ) - ySeg( 2 ) ) / urayt( 2 )
           x2 = x0 + h * urayt
           x2( 2 ) = ySeg( 2 )
+          snapDim = 1
           topRefl = .FALSE.
           botRefl = .FALSE.
           IF ( STEP_DEBUGGING ) &
@@ -637,6 +650,7 @@ CONTAINS
           h = hnew
        END IF
        x2 = x0 + h * urayt
+       snapDim = -2
        IF ( STEP_DEBUGGING ) &
           WRITE( PRTFile, * ) 'StepToBdry3D top diagonal crossing h to', h, x2
        topRefl = .FALSE.
@@ -666,6 +680,7 @@ CONTAINS
           h = hnew
        END IF
        x2 = x0 + h * urayt
+       snapDim = -2
        IF ( STEP_DEBUGGING ) &
           WRITE( PRTFile, * ) 'StepToBdry3D bottom diagonal crossing h to', h, x2
        topRefl = .FALSE.
@@ -678,6 +693,7 @@ CONTAINS
     IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN        ! is it taking an infinitesimal step?
        h = INFINITESIMAL_STEP_SIZE * Beam%deltas                 ! make sure we make some motion
        x2 = x0 + h * urayt
+       snapDim = -1
        IF ( STEP_DEBUGGING ) &
           WRITE( PRTFile, * ) 'StepToBdry3D small step forced h to ', h, x2
        ! Recheck reflection conditions
@@ -686,6 +702,7 @@ CONTAINS
           topRefl = .TRUE.
           flipTopDiag = .FALSE.
           flipBotDiag = .FALSE.
+          snapDim = 2
        ELSE
           topRefl = .FALSE.
        END IF
@@ -695,6 +712,7 @@ CONTAINS
           topRefl = .FALSE.
           flipTopDiag = .FALSE.
           flipBotDiag = .FALSE.
+          snapDim = 2
        ELSE
           botRefl = .FALSE.
        END IF
