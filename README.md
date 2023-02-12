@@ -255,6 +255,10 @@ distance from the receiver was commented out, meaning that every ray would be
 an eigenray. Furthermore, it assumed that any run other than eigenrays was
 coherent TL, ignoring incoherent, semi-coherent, and arrivals. This function
 was reworked to use `ApplyContribution` to support all of these run types.
+Also, the maximum distance from the receiver (`RadMax` / `RadiusMax`) was
+uninitialized on the Nx2D codepath (though in the original code, checking it
+was commented out so this didn't matter). It has been set to the same value as
+used for 2D SGB and Cerveny influence.
 
 ### Non-TL runs not handled correctly in Cerveny influence
 

@@ -269,6 +269,7 @@ SUBROUTINE BellhopCore
                              CASE ( 'g' )
                                 CALL InfluenceGeoHatRayCen(    U,       Angles%alpha( ialpha ), Angles%Dalpha )
                              CASE ( 'S' )
+                                RadMax       = 50 * c0 / freq  ! LP: Was missing / uninitialized.
                                 CALL InfluenceSGB(             U,       Angles%alpha( ialpha ), Angles%Dalpha, RadMax )
                              CASE ( 'B' )
                                 CALL InfluenceGeoGaussianCart( U,       Angles%alpha( ialpha ), Angles%Dalpha )
