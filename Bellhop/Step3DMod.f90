@@ -9,7 +9,7 @@ MODULE Step3DMod
   
 CONTAINS
 
-  SUBROUTINE Step3D( ray0, ray2, topRefl, botRefl, flipTopDiag, flipBotDiag )
+  SUBROUTINE Step3D( ray0, ray2, topRefl, botRefl )
 
     ! Does a single step along the ray
     ! x denotes the ray coordinate, ( x, y, z )
@@ -20,7 +20,7 @@ CONTAINS
 
     ! rays
     TYPE( ray3DPt ) :: ray0, ray1, ray2
-    LOGICAL, INTENT( OUT ) :: topRefl, botRefl, flipTopDiag, flipBotDiag
+    LOGICAL, INTENT( OUT ) :: topRefl, botRefl
     INTEGER         :: iSegx0, iSegy0, iSegz0, snapDim
     REAL  (KIND=8 ) :: gradc0( 3 ), gradc1( 3 ), gradc2( 3 ), &
          c0, cimag0, csq0, cxx0, cyy0, czz0, cxy0, cxz0, cyz0, cnn0, cmn0, cmm0, &
@@ -97,7 +97,7 @@ CONTAINS
     ! to put this on a boundary, and ensure that the resulting position
     ! ( ray2%x ) gets put precisely on the boundary.
     CALL StepToBdry3D( ray0%x, ray2%x, urayt2, iSegx0, iSegy0, iSegz0, h, &
-       topRefl, botRefl, flipTopDiag, flipBotDiag, snapDim )
+       topRefl, botRefl, snapDim )
     !write( *, * ) 'final coord ', ray2%x, w0, w1
     
     ! Update other variables with this new h
@@ -109,6 +109,9 @@ CONTAINS
     ray2%tau = ray0%tau + hw0 / CMPLX( c0, cimag0, KIND=8 ) + hw1 / CMPLX( c1, cimag1, KIND=8 )
     CALL UpdateRayPQ ( ray2, ray0, hw0, d_phi0, d_p_tilde0, d_p_hat0, d_q_tilde0, d_q_hat0 )
     CALL UpdateRayPQ ( ray2, ray2, hw1, d_phi1, d_p_tilde1, d_p_hat1, d_q_tilde1, d_q_hat1 ) ! Not a typo, accumulating into 2
+
+    IF ( STEP_DEBUGGING ) &
+       WRITE( PRTFile, * ) 'ray2%t', ray2%t
 
     ray2%Amp       = ray0%Amp
     ray2%Phase     = ray0%Phase
@@ -287,6 +290,8 @@ CONTAINS
     REAL (KIND=8) :: d( 3 ), d0( 3 ), tri_n( 3 )
     REAL (KIND=8) :: x( 3 )                                ! ray coordinate after full trial step
     REAL (KIND=8) :: xSeg( 2 ), ySeg( 2 )
+    REAL (KIND=8) :: over_diag_amount
+    LOGICAL       :: newSide, newOnEdge
 
     IF ( STEP_DEBUGGING ) &
        WRITE( PRTFile, * ) 'ReduceStep3D'
@@ -406,48 +411,63 @@ CONTAINS
 
     ! triangle crossing within a top segment
     hTopDiag = huge( hTopDiag )
-    d     = x  - Topxmid   ! vector from bottom center to ray end
-    d0    = x0 - Topxmid   ! vector from bottom center to ray origin
-    tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ), 0.0d0 ]
-    tri_n = tri_n / NORM2( tri_n )
-
-    IF ( CheckDiagCrossing( tri_n, d, Top_tridiag_pos ) ) THEN
-       hTopDiag = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       IF ( hTopDiag < 0.0D0 ) THEN
-          IF ( hTopDiag <= -1.0D-3 .AND. ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
-             CALL ERROUT( 'ReduceStep3D', 'Bad top tri diag crossing' )
+    IF ( .NOT. Top_td_onEdge ) THEN
+       d     = x  - Topxmid   ! vector from top    center to ray end
+       d0    = x0 - Topxmid   ! vector from top    center to ray origin
+       tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ), 0.0d0 ]
+       tri_n = tri_n / NORM2( tri_n )
+       over_diag_amount = DOT_PRODUCT( d, tri_n )
+       newSide = ( over_diag_amount >= 0.0D0 )
+       IF ( newSide .NEQV. Top_td_side ) THEN
+          newOnEdge = ( ABS( over_diag_amount ) < TRIDIAG_THRESH )
+          IF ( newOnEdge ) THEN
+             IF ( STEP_DEBUGGING ) &
+                WRITE( PRTFile, * ) 'ReduceStep3D Top naturally stepped to tri diag edge, h over_diag_amount', &
+                   over_diag_amount
+          ELSE
+             hTopDiag = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
+             IF ( hTopDiag < 0.0D0 ) THEN
+                WRITE( PRTFile, * ) 'ReduceStep3D Top BHC_WARN_TRIDIAG_H_NEGATIVE'
+                hTopDiag = 0.0D0
+             END IF
+             IF ( STEP_DEBUGGING ) &
+                WRITE( PRTFile, * ) 'Top tri diag crossing hTopDiag dot(n, d0) dot(n, d)', &
+                   hTopDiag, DOT_PRODUCT( tri_n, d0 ), over_diag_amount
           END IF
-          hTopDiag = 0.0D0
        END IF
-       IF ( STEP_DEBUGGING ) &
-          WRITE( PRTFile, * ) 'Top tri diag crossing hTopDiag dot(n, d0) dot(n, d)', &
-          hTopDiag, DOT_PRODUCT( tri_n, d0 ), DOT_PRODUCT( tri_n, d )
     END IF
 
     ! triangle crossing within a bottom segment
     hBotDiag = huge( hBotDiag )
-    d     = x  - Botxmid   ! vector from bottom center to ray end
-    d0    = x0 - Botxmid   ! vector from bottom center to ray origin
-    tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ), 0.0d0 ]
-    tri_n = tri_n / NORM2( tri_n )
-
-    IF ( CheckDiagCrossing( tri_n, d, Bot_tridiag_pos ) ) THEN
-       hBotDiag = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       IF ( hBotDiag < 0.0D0 ) THEN
-          IF ( hBotDiag <= -1.0D-3 .AND. ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
-             ! WRITE( PRTFile, * ) 'h7 dot', h7, DOT_PRODUCT( urayt, tri_n )
-             CALL ERROUT( 'ReduceStep3D', 'Bad bot tri diag crossing' )
+    IF ( .NOT. Bot_td_onEdge ) THEN
+       d     = x  - Botxmid   ! vector from bottom center to ray end
+       d0    = x0 - Botxmid   ! vector from bottom center to ray origin
+       tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ), 0.0d0 ]
+       tri_n = tri_n / NORM2( tri_n )
+       over_diag_amount = DOT_PRODUCT( d, tri_n )
+       newSide = ( over_diag_amount >= 0.0D0 )
+       IF ( newSide .NEQV. Bot_td_side ) THEN
+          newOnEdge = ( ABS( over_diag_amount ) < TRIDIAG_THRESH )
+          IF ( newOnEdge ) THEN
+             IF ( STEP_DEBUGGING ) &
+                WRITE( PRTFile, * ) 'ReduceStep3D Bot naturally stepped to tri diag edge, h over_diag_amount', &
+                   over_diag_amount
+          ELSE
+             hBotDiag = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
+             IF ( hBotDiag < 0.0D0 ) THEN
+                WRITE( PRTFile, * ) 'ReduceStep3D Bot BHC_WARN_TRIDIAG_H_NEGATIVE'
+                hBotDiag = 0.0D0
+             END IF
+             IF ( STEP_DEBUGGING ) &
+                WRITE( PRTFile, * ) 'Bot tri diag crossing hBotDiag dot(n, d0) dot(n, d)', &
+                   hBotDiag, DOT_PRODUCT( tri_n, d0 ), over_diag_amount
           END IF
-          hBotDiag = 0.0D0
        END IF
-       IF ( STEP_DEBUGGING ) &
-          WRITE( PRTFile, * ) 'Bot tri diag crossing hBotDiag dot(n, d0) dot(n, d)', &
-          hBotDiag, DOT_PRODUCT( tri_n, d0 ), DOT_PRODUCT( tri_n, d )
     END IF
     
     h = MIN( h, hInt, hBoxx, hBoxy, hBoxz, hTop, hBot, hxSeg, hySeg, hTopDiag, hBotDiag )  ! take limit set by shortest distance to a crossing
     IF ( h < -1d-4 ) THEN
-       WRITE( PRTFile, * ) 'Warning: negative h'
+       WRITE( PRTFile, * ) 'ReduceStep3D: negative h'
        ! CALL ERROUT( 'ReduceStep3D', 'negative h' )
     END IF
     IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN        ! is it taking an infinitesimal step?
@@ -461,17 +481,18 @@ CONTAINS
   ! **********************************************************************!
 
   SUBROUTINE StepToBdry3D( x0, x2, urayt, iSegx0, iSegy0, iSegz0, h, &
-    topRefl, botRefl, flipTopDiag, flipBotDiag, snapDim )
+    topRefl, botRefl, snapDim )
 
     INTEGER,       INTENT( IN    ) :: iSegx0, iSegy0, iSegz0
     REAL (KIND=8), INTENT( IN    ) :: x0( 3 ), urayt( 3 )  ! ray coordinate and tangent
     REAL (KIND=8), INTENT( INOUT ) :: x2( 3 ), h           ! output coord, reduced step size
-    LOGICAL,       INTENT( OUT   ) :: topRefl, botRefl, flipTopDiag, flipBotDiag
+    LOGICAL,       INTENT( OUT   ) :: topRefl, botRefl
     INTEGER,       INTENT( OUT   ) :: snapDim
     REAL (KIND=8) :: d( 3 ), d0( 3 ), tri_n( 3 )
     REAL (KIND=8) :: xSeg( 2 ), ySeg( 2 )                  ! boundary limits
     INTEGER                        :: k
-    REAL (KIND=8) :: hnew
+    REAL (KIND=8) :: hnew, over_diag_amount
+    LOGICAL       :: newSide, newOnEdge
 
     ! Original step due to maximum step size
     h = Beam%deltas
@@ -631,63 +652,77 @@ CONTAINS
     END IF
 
     ! triangle crossing within a top segment
-    d     = x2 - Topxmid   ! vector from bottom center to ray end
-    d0    = x0 - Topxmid   ! vector from bottom center to ray origin
-    tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ), 0.0d0 ]
-    tri_n = tri_n / NORM2( tri_n )
-
-    IF ( CheckDiagCrossing( tri_n, d, Top_tridiag_pos ) ) THEN
-       hnew = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       IF ( hnew < 0.0D0 ) THEN
-          IF ( hnew <= -1.0D-3 .AND. ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
-             CALL ERROUT( 'StepToBdry3D', 'Bad top tri diag crossing' )
+    IF ( .NOT. Top_td_onEdge ) THEN
+       d     = x2 - Topxmid   ! vector from top    center to ray end
+       d0    = x0 - Topxmid   ! vector from top    center to ray origin
+       tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ), 0.0d0 ]
+       tri_n = tri_n / NORM2( tri_n )
+       over_diag_amount = DOT_PRODUCT( d, tri_n )
+       newSide = ( over_diag_amount >= 0.0D0 )
+       IF ( newSide .NEQV. Top_td_side ) THEN
+          newOnEdge = ( ABS( over_diag_amount ) < TRIDIAG_THRESH )
+          IF ( newOnEdge ) THEN
+             IF ( STEP_DEBUGGING ) &
+                WRITE( PRTFile, * ) 'StepToBdry3D Top naturally stepped to tri diag edge, h over_diag_amount', &
+                   over_diag_amount
+          ELSE
+             hnew = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
+             IF ( hnew < 0.0D0 ) THEN
+                WRITE( PRTFile, * ) 'StepToBdry3D Top BHC_WARN_TRIDIAG_H_NEGATIVE'
+                h = 0.0D0
+             ELSE
+                IF ( hnew >= h ) &
+                   WRITE( PRTFile, * ) 'StepToBdry3D Top BHC_WARN_TRIDIAG_H_GROWING'
+                h = hnew
+             END IF
+             IF ( STEP_DEBUGGING ) &
+                WRITE( PRTFile, * ) 'StepToBdry3D Top tri diag crossing hnew dot(n, d0) dot(n, d)', &
+                   hnew, DOT_PRODUCT( tri_n, d0 ), over_diag_amount
+             x2 = x0 + h * urayt
+             Top_td_justSteppedTo = .TRUE.
+             Top_td_outgoingSide = newSide
+             snapDim = -2
+             topRefl = .FALSE.
+             botRefl = .FALSE.
           END IF
-          h = 0.0D0
-       ELSE
-          IF ( hnew >= h ) THEN
-             CALL ERROUT( 'StepToBdry3D', 'Bad 2 top tri diag crossing' )
-          END IF
-          h = hnew
        END IF
-       x2 = x0 + h * urayt
-       snapDim = -2
-       IF ( STEP_DEBUGGING ) &
-          WRITE( PRTFile, * ) 'StepToBdry3D top diagonal crossing h to', h, x2
-       topRefl = .FALSE.
-       botRefl = .FALSE.
-       flipTopDiag = .TRUE.
-    ELSE
-       flipTopDiag = .FALSE.
     END IF
 
     ! triangle crossing within a bottom segment
-    d     = x2 - Botxmid   ! vector from bottom center to ray end
-    d0    = x0 - Botxmid   ! vector from bottom center to ray origin
-    tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ), 0.0d0 ]
-    tri_n = tri_n / NORM2( tri_n )
-
-    IF ( CheckDiagCrossing( tri_n, d, Bot_tridiag_pos ) ) THEN
-       hnew = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
-       IF ( hnew < 0.0D0 ) THEN
-          IF ( hnew <= -1.0D-3 .AND. ABS( DOT_PRODUCT( urayt, tri_n ) ) >= 1.0D-3 ) THEN
-             CALL ERROUT( 'StepToBdry3D', 'Bad bot tri diag crossing' )
+    IF ( .NOT. Bot_td_onEdge ) THEN
+       d     = x2 - Botxmid   ! vector from bottom center to ray end
+       d0    = x0 - Botxmid   ! vector from bottom center to ray origin
+       tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ), 0.0d0 ]
+       tri_n = tri_n / NORM2( tri_n )
+       over_diag_amount = DOT_PRODUCT( d, tri_n )
+       newSide = ( over_diag_amount >= 0.0D0 )
+       IF ( newSide .NEQV. Bot_td_side ) THEN
+          newOnEdge = ( ABS( over_diag_amount ) < TRIDIAG_THRESH )
+          IF ( newOnEdge ) THEN
+             IF ( STEP_DEBUGGING ) &
+                WRITE( PRTFile, * ) 'StepToBdry3D Bot naturally stepped to tri diag edge, h over_diag_amount', &
+                   over_diag_amount
+          ELSE
+             hnew = -DOT_PRODUCT( d0, tri_n ) / DOT_PRODUCT( urayt, tri_n )
+             IF ( hnew < 0.0D0 ) THEN
+                WRITE( PRTFile, * ) 'StepToBdry3D Bot BHC_WARN_TRIDIAG_H_NEGATIVE'
+                h = 0.0D0
+             ELSE
+                IF ( hnew >= h ) &
+                   WRITE( PRTFile, * ) 'StepToBdry3D Bot BHC_WARN_TRIDIAG_H_GROWING'
+                h = hnew
+             END IF
+             IF ( STEP_DEBUGGING ) &
+                WRITE( PRTFile, * ) 'StepToBdry3D Bot tri diag crossing hnew dot(n, d0) dot(n, d)', &
+                   hnew, DOT_PRODUCT( tri_n, d0 ), over_diag_amount
+             x2 = x0 + h * urayt
+             Bot_td_justSteppedTo = .TRUE.
+             Bot_td_outgoingSide = newSide
+             snapDim = -2
+             topRefl = .FALSE.
+             botRefl = .FALSE.
           END IF
-          h = 0.0D0
-       ELSE
-          IF ( hnew >= h ) THEN
-             CALL ERROUT( 'StepToBdry3D', 'Bad 2 bot tri diag crossing' )
-          END IF
-          h = hnew
        END IF
-       x2 = x0 + h * urayt
-       snapDim = -2
-       IF ( STEP_DEBUGGING ) &
-          WRITE( PRTFile, * ) 'StepToBdry3D bottom diagonal crossing h to', h, x2
-       topRefl = .FALSE.
-       botRefl = .FALSE.
-       flipBotDiag = .TRUE.
-    ELSE
-       flipBotDiag = .FALSE.
     END IF
 
     IF ( h < INFINITESIMAL_STEP_SIZE * Beam%deltas ) THEN        ! is it taking an infinitesimal step?
@@ -700,8 +735,8 @@ CONTAINS
        d = x2 - Topx ! vector from top to ray
        IF ( DOT_PRODUCT( Topn, d ) > EPSILON( d( 1 ) ) ) THEN
           topRefl = .TRUE.
-          flipTopDiag = .FALSE.
-          flipBotDiag = .FALSE.
+          Top_td_justSteppedTo = .FALSE.
+          Bot_td_justSteppedTo = .FALSE.
           snapDim = 2
        ELSE
           topRefl = .FALSE.
@@ -710,25 +745,16 @@ CONTAINS
        IF ( DOT_PRODUCT( Botn, d ) > EPSILON( d( 1 ) ) ) THEN
           botRefl = .TRUE.
           topRefl = .FALSE.
-          flipTopDiag = .FALSE.
-          flipBotDiag = .FALSE.
+          Top_td_justSteppedTo = .FALSE.
+          Bot_td_justSteppedTo = .FALSE.
           snapDim = 2
        ELSE
           botRefl = .FALSE.
        END IF
+    ELSE
+       IF ( STEP_DEBUGGING ) &
+          WRITE( PRTFile, * ) 'StepToBdry3D normal h to ', h, x2
     END IF
   END SUBROUTINE StepToBdry3D
-
-  LOGICAL FUNCTION CheckDiagCrossing( tri_n, d, tridiag_pos )
-    REAL (KIND=8), INTENT( IN ) :: tri_n( 3 ), d( 3 )
-    LOGICAL, INTENT( IN ) :: tridiag_pos
-    REAL (KIND=8) :: dend
-    
-    dend = DOT_PRODUCT( tri_n, d )
-    ! WRITE( PRTFile, * ) 'pos dend', tridiag_pos, dend
-    
-    CheckDiagCrossing = ( tridiag_pos .AND. dend < -TRIDIAG_THRESH ) &
-             .OR. ( .NOT. tridiag_pos .AND. dend >  TRIDIAG_THRESH )
-  END FUNCTION CheckDiagCrossing
 
 END MODULE Step3DMod

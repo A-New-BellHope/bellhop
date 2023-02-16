@@ -501,7 +501,7 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
   REAL     (KIND=8) :: tinit( 2 ), tradial( 2 ), BotnInt( 3 ), TopnInt( 3 ), s1, s2
   REAL     (KIND=8) :: z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy
   REAL     (KIND=8) :: term_minx, term_miny, term_maxx, term_maxy
-  LOGICAL           :: topRefl, botRefl, flipTopDiag, flipBotDiag
+  LOGICAL           :: topRefl, botRefl
 
   ! *** Initial conditions ***
 
@@ -541,14 +541,12 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
      is  = is + 1
      is1 = is + 1
 
-     CALL Step2D( ray2D( is ), ray2D( is1 ), tradial, topRefl, botRefl, flipTopDiag, flipBotDiag )
+     CALL Step2D( ray2D( is ), ray2D( is1 ), tradial, topRefl, botRefl )
 
      ! convert polar coordinate of ray to x-y coordinate
      x = RayToOceanX( ray2D( is1 )%x, xs_3D, tradial )
      t_o = RayToOceanT( ray2D( is1 )%t, tradial )
      
-     IF ( flipTopDiag ) Top_tridiag_pos = .NOT. Top_tridiag_pos
-     IF ( flipBotDiag ) Bot_tridiag_pos = .NOT. Bot_tridiag_pos
      CALL GetTopSeg3D( x, t_o, .FALSE. )    ! identify the top    segment above the source
      CALL GetBotSeg3D( x, t_o, .FALSE. )    ! identify the bottom segment below the source
 
@@ -685,7 +683,7 @@ END SUBROUTINE TraceRay2D
 
 ! **********************************************************************!
 
-SUBROUTINE Step2D( ray0, ray2, tradial, topRefl, botRefl, flipTopDiag, flipBotDiag )
+SUBROUTINE Step2D( ray0, ray2, tradial, topRefl, botRefl )
 
   ! Does a single step along the ray
   ! x denotes the ray coordinate, (r,z)
@@ -695,7 +693,7 @@ SUBROUTINE Step2D( ray0, ray2, tradial, topRefl, botRefl, flipTopDiag, flipBotDi
   USE Step3DMod
 
   REAL (KIND=8), INTENT( IN ) :: tradial( 2 )   ! coordinate of source and ray bearing angle
-  LOGICAL, INTENT( OUT ) :: topRefl, botRefl, flipTopDiag, flipBotDiag
+  LOGICAL, INTENT( OUT ) :: topRefl, botRefl
   TYPE( ray2DPt )    :: ray0, ray1, ray2
   INTEGER            :: iSegx0, iSegy0, iSegz0, snapDim
   REAL     (KIND=8 ) :: gradc0( 2 ), gradc1( 2 ), gradc2( 2 ), rho, &
@@ -766,7 +764,7 @@ SUBROUTINE Step2D( ray0, ray2, tradial, topRefl, botRefl, flipTopDiag, flipBotDi
   ! to put this on a boundary, and ensure that the resulting position
   ! ( ray2%x ) gets put precisely on the boundary.
   CALL StepToBdry3D( rayx3D, x2_o, rayt3D, iSegx0, iSegy0, iSegz0, h, &
-     topRefl, botRefl, flipTopDiag, flipBotDiag, snapDim )
+     topRefl, botRefl, snapDim )
   ray2%x = OceanToRayX( x2_o, xs_3D, tradial, urayt2, snapDim )
   IF ( STEP_DEBUGGING ) THEN
      x2_o_out = RayToOceanX( ray2%x, xs_3D, tradial )
@@ -910,7 +908,7 @@ SUBROUTINE TraceRay3D( alpha, beta, epsilon, Amp0 )
   REAL     (KIND=8) :: s1, s2
   REAL     (KIND=8) :: z_xx, z_xy, z_yy, kappa_xx, kappa_xy, kappa_yy
   REAL     (KIND=8) :: tinit( 3 )
-  LOGICAL           :: topRefl, botRefl, flipTopDiag, flipBotDiag
+  LOGICAL           :: topRefl, botRefl
   REAL     (KIND=8) :: term_minx, term_miny, term_maxx, term_maxy, term_x( 3 ), term_t( 3 )
 
   ! *** Initial conditions ***
@@ -969,10 +967,8 @@ SUBROUTINE TraceRay3D( alpha, beta, epsilon, Amp0 )
      is  = is + 1
      is1 = is + 1
 
-     CALL Step3D( ray3D( is ), ray3D( is1 ), topRefl, botRefl, flipTopDiag, flipBotDiag )
+     CALL Step3D( ray3D( is ), ray3D( is1 ), topRefl, botRefl )
      
-     IF ( flipTopDiag ) Top_tridiag_pos = .NOT. Top_tridiag_pos
-     IF ( flipBotDiag ) Bot_tridiag_pos = .NOT. Bot_tridiag_pos
      CALL GetTopSeg3D( ray3D( is1 )%x, ray3D( is1 )%t, .FALSE. )   ! identify the top    segment above the source
      CALL GetBotSeg3D( ray3D( is1 )%x, ray3D( is1 )%t, .FALSE. )   ! identify the bottom segment below the source
 
@@ -990,6 +986,8 @@ SUBROUTINE TraceRay3D( alpha, beta, epsilon, Amp0 )
      CALL Distances3D( ray3D( is1 )%x, Topx, Botx, Topn, Botn, DistEndTop, DistEndBot )
 
      IF ( topRefl ) THEN
+        IF ( STEP_DEBUGGING ) &
+           WRITE( PRTFile, * ) 'Top reflecting'
         IF ( atiType == 'C' ) THEN
            s1 = ( ray3D( is1 )%x( 1 ) - Topx( 1 ) ) / ( xTopSeg( 2 ) - xTopSeg( 1 ) )   ! proportional distance along segment
            s2 = ( ray3D( is1 )%x( 2 ) - Topx( 2 ) ) / ( yTopSeg( 2 ) - yTopSeg( 1 ) )   ! proportional distance along segment
@@ -1021,6 +1019,8 @@ SUBROUTINE TraceRay3D( alpha, beta, epsilon, Amp0 )
         CALL Distances3D( ray3D( is + 1 )%x, Topx,  Botx, Topn, Botn, DistEndTop, DistEndBot )
 
      ELSE IF ( botRefl ) THEN
+        IF ( STEP_DEBUGGING ) &
+           WRITE( PRTFile, * ) 'Bottom reflecting'
 
         IF ( btyType == 'C' ) THEN
            s1 = ( ray3D( is1 )%x( 1 ) - Botx( 1 ) ) / ( xBotSeg( 2 ) - xBotSeg( 1 ) )   ! proportional distance along segment
