@@ -41,7 +41,7 @@ CONTAINS
        WRITE( PRTFile, * ) 'ray0 x t', ray0%x, ray0%t
        WRITE( PRTFile, * ) 'ray0 p q', ray0%p_tilde, ray0%q_tilde
        WRITE( PRTFile, * ) '        ', ray0%p_hat,   ray0%q_hat
-       WRITE( PRTFile, * ) 'iSegx iSegy iSegz', iSegx, iSegy, iSegz
+       WRITE( PRTFile, * ) 'iSegx iSegy iSegz Top_td_side Bot_td_side', iSegx, iSegy, iSegz, Top_td_side, Bot_td_side
     END IF
     
     ! The numerical integrator used here is a version of the polygon (a.k.a. midpoint, leapfrog, or Box method), and similar

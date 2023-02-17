@@ -400,13 +400,15 @@ CONTAINS
     Top_tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ) ]
     Top_tri_n = Top_tri_n / NORM2( Top_tri_n )
     over_diag_amount = DOT_PRODUCT( x( 1 : 2 ) - Topxmid( 1 : 2 ), Top_tri_n )
-    ! WRITE( PRTFile, * ) 'Top_tri_n over_diag_amount', Top_tri_n, over_diag_amount
-    IF ( isInit .OR. .NOT. Top_td_justSteppedTo ) THEN
-       Top_td_side = ( over_diag_amount >= 0.0D0 )
-    ELSE
-       Top_td_side = Top_td_outgoingSide
-    END IF
     Top_td_onEdge = ( ABS( over_diag_amount ) < TRIDIAG_THRESH )
+    ! WRITE( PRTFile, * ) 'Top_tri_n over_diag_amount', Top_tri_n, over_diag_amount
+    IF ( .NOT. isInit .AND. Top_td_justSteppedTo ) THEN
+       Top_td_side = Top_td_outgoingSide
+    ELSE IF ( .NOT. isInit .AND. Top_td_onEdge ) THEN
+       Top_td_side = ( DOT_PRODUCT( t( 1 : 2 ), Top_tri_n ) >= 0.0D0 )
+    ELSE
+       Top_td_side = ( over_diag_amount >= 0.0D0 )
+    END IF
     Top_td_justSteppedTo = .FALSE.
     IF ( .NOT. Top_td_side ) THEN
        Topn = Top( IsegTopx, IsegTopy )%n1
@@ -498,12 +500,14 @@ CONTAINS
     Bot_tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ) ]
     Bot_tri_n = Bot_tri_n / NORM2( Bot_tri_n )
     over_diag_amount = DOT_PRODUCT( x( 1 : 2 ) - Botxmid( 1 : 2 ), Bot_tri_n )
-    IF ( isInit .OR. .NOT. Bot_td_justSteppedTo ) THEN
-       Bot_td_side = ( over_diag_amount >= 0.0D0 )
-    ELSE
-       Bot_td_side = Bot_td_outgoingSide
-    END IF
     Bot_td_onEdge = ( ABS( over_diag_amount ) < TRIDIAG_THRESH )
+    IF ( .NOT. isInit .AND. Bot_td_justSteppedTo ) THEN
+       Bot_td_side = Bot_td_outgoingSide
+    ELSE IF ( .NOT. isInit .AND. Bot_td_onEdge ) THEN
+       Bot_td_side = ( DOT_PRODUCT( t( 1 : 2 ), Bot_tri_n ) >= 0.0D0 )
+    ELSE
+       Bot_td_side = ( over_diag_amount >= 0.0D0 )
+    END IF
     Bot_td_justSteppedTo = .FALSE.
     IF ( .NOT. Bot_td_side ) THEN
        Botn = Bot( IsegBotx, IsegBoty )%n1
