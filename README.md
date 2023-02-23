@@ -325,7 +325,10 @@ that when it gets to the boundary of the beam box, the step size is reduced to
 zero and then forced to a small number. The ray takes 50 of these small steps
 (millimeters over the boundary) and then terminates due to `iSmallStepCtr`. This
 behavior is not useful compared to just ending at the boundary, so the
-conditions have been restored.
+conditions have been restored. Furthermore, all of the box conditions have been
+changed from `>` to `>=`; this is so that a ray which steps to the box will then
+terminate on that step, instead of taking another infinitesimal step over the
+boundary and then terminating.
 
 ### Intentional asymmetry between X and Y crossing thresholds
 
@@ -515,17 +518,19 @@ floating-point error, to the minimum step size of about 1e-5. This larger error
 increases the chances of inconsistent behaviors later.
 
 The inconsistency in which side of a boundary a step is to also directly causes
-another issue. There are several stopping conditions for rays, for example the
-level becoming too low, but crucially the last step which violated the stopping
-condition is still written. If a ray stops after a step to a certain boundary,
-whether receivers on that boundary are considered for TL / eigenrays / arrivals
-is determined by whether the ray is behind or ahead of that boundary. Of course,
-since environment files use round numbers, receivers being exactly on boundaries
-is very common! This can substantially change the receiver outputs. Even for
-steps in the middle of rays, another mechanism which can amplify errors is
-whether the step before a boundary or the step after that boundary influences
-receivers which are on that boundary, as those two steps generally have
-different slopes and would influence the receiver slightly differently.
+another issue. Since environment files use round numbers, receivers being
+exactly on boundaries is very common. Whether the step is slightly before or
+slightly after the boundary (receivers) determines whether the incoming step or
+the outgoing step influences the receivers. Often the change between these two
+is small, but sometimes it is large. For example, if the outgoing step is an
+infinitesimal step, a great deal of precision is lost when computing the delay
+at the receiver, which can substantially change the phase. (For example, in one
+case we looked at in detail, the delay was `32.473` instead of `32.467`, due to
+this effect an error of about 0.01%. Due to the frequency `omega = 314.159`,
+this shifted the phase by about a quadrant, causing the final results at this
+receiver to be unrecognizable compared to the original.) Or, if this boundary is
+the stopping condition for the ray, there is no outgoing step, so the receivers
+will be influenced or not influenced at all.
 
 Second, error can accumulate just due to the integration, even without any of
 the "hard edge" cases discussed next. A small error in the initial trajectory
@@ -559,15 +564,6 @@ hit it in the C++/CUDA version, the relative error is 100%; but even worse, if
 the ray does not hit the receiver in the Fortran version but does hit it in the
 C++/CUDA version, the relative error is *infinite*!
 
-There is one more way a small error in a variable can result in a large change
-in the field. The equation for computing coherent influence involves the term
-`EXP( -i * ( omega * delay - phaseInt ) )`. For a typical frequency of 50 Hz,
-`omega = 314.159`. This means that tiny errors in the delay can completely
-change the phase of the output. For example, in one case we looked at in detail,
-the delay was `32.473` instead of `32.467`, an error of about 0.01%. This
-shifted the phase by about a quadrant, causing the final results at this
-receiver to be unrecognizable compared to the original.
-
 ### Fix for boundary stepping inconsistency
 
 There is no one fix for all of these circumstances, but a fix has been
@@ -584,20 +580,24 @@ it can move forward a nontrival distance and remain in the same segment. The
 idea is, since every step must be an edge case, it is put *exactly* on the edge,
 and then that exactly-on-the-edge position is handled in a consistent manner.
 
-This gets more complicated for crossing the diagonals in 3D, as the boundary
-is not a single fixed floating-point value from an environment file. In this
-case, flags `Top_tridiag_pos` and `Bot_tridiag_pos` are used to store which side
-of the boundary the ray is on while its position is nearly on top of the
-boundary. The behavior is still to step to the boundary and then be on the
-boundary but in the other side.
+This gets more complicated for crossing the diagonals in 3D (and Nx2D), as the
+boundary does not have a single, fixed value in one dimension. In this case, a
+set of flags `Top_td_*` and `Bot_td_*` are used to store information about which
+side of the boundary the ray is on while its position is nearly on top of the
+boundary. The stepping process takes these into account and produces behavior
+which is generally consistent for large steps to and then from the boundary. It
+also attempts to not interfere with cases where a ray is traced along this
+diagonal boundary, or lands on the boundary due to stepping to a different
+boundary.
 
 Things are even worse for Nx2D, where a 2D ray has to step to 3D boundaries, in
-a way that survives a transformation to 2D and then back to 3D. A system
-(`OceanToRayX`) was put in place which attempts to step to the exact value, and
-if that fails, at least steps to the correct (next) side of the 3D boundary.
-However, this does not reduce divergence between cases, as one case may be able
-to snap to the exact boundary and another may not, due to infinitesimal
-differences in the input values.
+a way that survives a transformation to 2D and then back to 3D. To handle this,
+a system (`OceanToRayX`) was put in place which attempts to step to the exact
+value in whatever dimension is relevant to the boundary being stepped to. If it
+is not able to find a floating-point value which will remain exactly on the
+boundary after the 3D - 2D - 3D transformation, it uses the next floating-point
+value past the boundary in the direction of the ray tangent, so the ray will be
+in the next segment and will not add a superfluous infinitesimal step.
 
 ### Case study: missing iSegz, iSegr initialization
 

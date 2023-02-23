@@ -753,7 +753,7 @@ CONTAINS
        END IF
     ELSE
        IF ( STEP_DEBUGGING ) &
-          WRITE( PRTFile, * ) 'StepToBdry3D normal h to ', h, x2
+          WRITE( PRTFile, * ) 'StepToBdry3D regular h to ', h, x2
     END IF
   END SUBROUTINE StepToBdry3D
 
