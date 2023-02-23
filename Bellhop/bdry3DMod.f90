@@ -25,7 +25,10 @@ MODULE bdry3Dmod
        Topn( 3 ), Botn( 3 ), &    ! tangent and normal    of active triangle
        Topxmid( 3 ), Botxmid( 3 ) ! coordinates of center of active rectangle
        ! because corners may be at big number and mess up floating point precision
-  LOGICAL            :: Top_tridiag_pos, Bot_tridiag_pos ! whether in positive / n2 triangle
+  LOGICAL            :: Top_td_side, Bot_td_side ! whether in positive / n2 triangle
+  LOGICAL            :: Top_td_onEdge, Bot_td_onEdge
+  LOGICAL            :: Top_td_justSteppedTo, Bot_td_justSteppedTo
+  LOGICAL            :: Top_td_outgoingSide, Bot_td_outgoingSide
   REAL (KIND=8), PARAMETER :: TRIDIAG_THRESH = 3D-6
   REAL (KIND=8), PARAMETER :: big = 1E25                  ! large number used for domain termination when no altimetry/bathymetry given
   !big = sqrt( huge( Top( 1, 1 )%x ) ) / 1.0d5
@@ -397,13 +400,17 @@ CONTAINS
     Top_tri_n = [ -( yTopSeg( 2 ) - yTopSeg( 1 ) ), xTopSeg( 2 ) - xTopSeg( 1 ) ]
     Top_tri_n = Top_tri_n / NORM2( Top_tri_n )
     over_diag_amount = DOT_PRODUCT( x( 1 : 2 ) - Topxmid( 1 : 2 ), Top_tri_n )
+    Top_td_onEdge = ( ABS( over_diag_amount ) < TRIDIAG_THRESH )
     ! WRITE( PRTFile, * ) 'Top_tri_n over_diag_amount', Top_tri_n, over_diag_amount
-    IF ( ABS( over_diag_amount ) > TRIDIAG_THRESH ) THEN
-       Top_tridiag_pos = ( over_diag_amount >= 0.0D0 )
-    ELSE IF ( isInit ) THEN
-       Top_tridiag_pos = DOT_PRODUCT( t( 1 : 2 ), Top_tri_n ) >= 0.0D0
+    IF ( .NOT. isInit .AND. Top_td_justSteppedTo ) THEN
+       Top_td_side = Top_td_outgoingSide
+    ELSE IF ( .NOT. isInit .AND. Top_td_onEdge ) THEN
+       Top_td_side = ( DOT_PRODUCT( t( 1 : 2 ), Top_tri_n ) >= 0.0D0 )
+    ELSE
+       Top_td_side = ( over_diag_amount >= 0.0D0 )
     END IF
-    IF ( .NOT. Top_tridiag_pos ) THEN
+    Top_td_justSteppedTo = .FALSE.
+    IF ( .NOT. Top_td_side ) THEN
        Topn = Top( IsegTopx, IsegTopy )%n1
     ELSE
        Topn = Top( IsegTopx, IsegTopy )%n2
@@ -493,12 +500,16 @@ CONTAINS
     Bot_tri_n = [ -( yBotSeg( 2 ) - yBotSeg( 1 ) ), xBotSeg( 2 ) - xBotSeg( 1 ) ]
     Bot_tri_n = Bot_tri_n / NORM2( Bot_tri_n )
     over_diag_amount = DOT_PRODUCT( x( 1 : 2 ) - Botxmid( 1 : 2 ), Bot_tri_n )
-    IF ( ABS( over_diag_amount ) > TRIDIAG_THRESH ) THEN
-       Bot_tridiag_pos = ( over_diag_amount >= 0.0D0 )
-    ELSE IF ( isInit ) THEN
-       Bot_tridiag_pos = DOT_PRODUCT( t( 1 : 2 ), Bot_tri_n ) >= 0.0D0
+    Bot_td_onEdge = ( ABS( over_diag_amount ) < TRIDIAG_THRESH )
+    IF ( .NOT. isInit .AND. Bot_td_justSteppedTo ) THEN
+       Bot_td_side = Bot_td_outgoingSide
+    ELSE IF ( .NOT. isInit .AND. Bot_td_onEdge ) THEN
+       Bot_td_side = ( DOT_PRODUCT( t( 1 : 2 ), Bot_tri_n ) >= 0.0D0 )
+    ELSE
+       Bot_td_side = ( over_diag_amount >= 0.0D0 )
     END IF
-    IF ( .NOT. Bot_tridiag_pos ) THEN
+    Bot_td_justSteppedTo = .FALSE.
+    IF ( .NOT. Bot_td_side ) THEN
        Botn = Bot( IsegBotx, IsegBoty )%n1
     ELSE
        Botn = Bot( IsegBotx, IsegBoty )%n2

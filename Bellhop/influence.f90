@@ -654,6 +654,7 @@ CONTAINS
   
   SUBROUTINE ApplyContribution( U )
     COMPLEX, INTENT( INOUT ) :: U
+    COMPLEX ( KIND=4 ) :: dfield
     
     SELECT CASE( Beam%RunType( 1 : 1 ) )
     CASE ( 'E' )                ! eigenrays
@@ -665,7 +666,9 @@ CONTAINS
     CASE ( 'A', 'a' )           ! arrivals
        CALL AddArr( omega, iz, ir, Amp, phaseInt, delay, SrcDeclAngle, RcvrDeclAngle, ray2D( iS )%NumTopBnc, ray2D( iS )%NumBotBnc )
     CASE ( 'C' )                ! coherent TL
-       U = U + CMPLX( Amp * EXP( -i * ( omega * delay - phaseInt ) ) )
+       dfield = CMPLX( Amp * EXP( -i * ( omega * delay - phaseInt ) ) )
+       ! WRITE( PRTFile, * ) 'ApplyContribution dfield', dfield
+       U = U + dfield
                      ! omega * n * n / ( 2 * ray2d( iS )%c**2 * delay ) ) ) )   ! curvature correction
     CASE DEFAULT                ! incoherent/semicoherent TL
        IF ( Beam%Type( 1 : 1 ) == 'B' ) THEN   ! Gaussian beam
