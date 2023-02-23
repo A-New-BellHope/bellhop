@@ -7,7 +7,7 @@ BELLHOP/BELLHOP3D: `bellhopcxx`/`bellhopcuda`](https://github.com/A-New-BellHope
 ### Impressum
 
 Copyright (C) 2021-2023 The Regents of the University of California \
-c/o Jules Jaffe team at SIO / UCSD, jjaffe@ucsd.edu \
+Marine Physical Lab at Scripps Oceanography, c/o Jules Jaffe, jjaffe@ucsd.edu \
 Copyright (C) 1983-2022 Michael B. Porter
 
 This program is free software: you can redistribute it and/or modify
