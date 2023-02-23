@@ -35,7 +35,7 @@ integration is typically set to a large value, and is then reduced so that the
 step lands on the nearest "boundary". (Here, this refers not only to the ocean
 surface and floor, but to any "plane" within the ocean where the SSP changes,
 where the bottom has a corner/vertex in its definition, and so on.) Thus, for
-typical runs, every step of every ray in `BELLHOP` lands on an edge case.
+typical runs, **every step of every ray in `BELLHOP` lands on an edge case**.
 Depending on the exact set of floating-point operations done and the specific
 inputs, these steps "randomly" land just before or just after the boundary. This
 means the step "randomly" ends up in different segments, which leads to further
@@ -134,10 +134,10 @@ ends up overwriting all parts of the 3D matrix.
 
 ### Incorrect handling of 3D Gaussian ray-centered semi-coherent or incoherent
 
-The code that applies the factor of 2*pi for Gaussian beams to semi-coherent or
-incoherent in 3D `ApplyContribution` only checked if the beam was Gaussian
+The code that applies the factor of `2*pi` for Gaussian beams to semi-coherent
+or incoherent in 3D `ApplyContribution` only checked if the beam was Gaussian
 Cartesian (`'B'`), not Gaussian ray-centered (`'b'`), so the latter did not get
-the 2*pi factor. This has been fixed.
+the `2*pi` factor. This has been fixed.
 
 ### Polarity flipping
 
