@@ -121,11 +121,14 @@ CONTAINS
 
        Refl = ( HS%rho * gamma1 - gamma2 ) / ( HS%rho * gamma1 + gamma2 )
        !write( *, * ) abs( Refl ), c, HS%cp, rho, HS%rho
+       ! LP: Removed this code as it was obviously modified to do nothing
+       ! ( ABS( anything ) < 0 is always false ), and users would likely be
+       ! unpleasantly surprised if it did do what it was intended to do.
        ! Hack to make a wall (where the bottom slope is more than 80 degrees) be a perfect reflector
        !!!!!!!!!!!
-       IF ( ABS( RadDeg * ATAN2( nBdry( 3 ), NORM2( nBdry( 1 : 2 ) ) ) ) < 0 ) THEN   ! was 60 degrees
-          Refl = 1
-       END IF
+       !IF ( ABS( RadDeg * ATAN2( nBdry( 3 ), NORM2( nBdry( 1 : 2 ) ) ) ) < 0 ) THEN   ! was 60 degrees
+       !   Refl = 1
+       !END IF
 
        IF ( ABS( Refl ) < 1.0E-5 ) THEN   ! kill a ray that has lost its energy in reflection
           ray3D( is1 )%Amp   = 0.0

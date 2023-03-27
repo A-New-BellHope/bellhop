@@ -156,16 +156,16 @@ CONTAINS
     END IF
 
     ! *** Beam characteristics ***
-       Beam%Type( 4 : 4 ) = Beam%RunType( 7 : 7 )   ! selects beam shift option
+    Beam%Type( 4 : 4 ) = Beam%RunType( 7 : 7 )   ! selects beam shift option
           
-       SELECT CASE ( Beam%Type( 4 : 4 ) )
-       CASE ( 'S' )
+    SELECT CASE ( Beam%Type( 4 : 4 ) )
+    CASE ( 'S' )
           WRITE( PRTFile, * ) 'Beam shift in effect'
-       CASE DEFAULT
+    CASE DEFAULT
           WRITE( PRTFile, * ) 'No beam shift in effect'
-       END SELECT
+    END SELECT
 
-       IF ( Beam%RunType( 1 : 1 ) /= 'R' ) THEN   ! no worry about the beam type if this is a ray trace run
+    IF ( Beam%RunType( 1 : 1 ) /= 'R' ) THEN   ! no worry about the beam type if this is a ray trace run
 
        ! Beam%Type( 1 : 1 ) is
        !   'G' or '^' Geometric hat beams in Cartesian coordinates
