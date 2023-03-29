@@ -9,6 +9,7 @@ MODULE sspmod
   ! Therefore more information is pre-computed
 
   USE FatalError
+  USE monotonicMod
   IMPLICIT NONE
 
   SAVE
@@ -393,7 +394,7 @@ END SUBROUTINE EvaluateSSP2D
        WRITE( PRTFile, * ) 'Number of SSP ranges = ', SSP%Nr
 
        IF ( SSP%Nr < 2 ) THEN
-          CALL ERROUT( 'sspMod: Quad', 'You must have a least two profiles in your 2D SSP field'  )
+          CALL ERROUT( 'sspMod: Quad', 'You must have at least two profiles in your 2D SSP field'  )
        END IF
 
        ALLOCATE( SSP%cMat( SSP%NPts, SSP%Nr ), SSP%czMat( SSP%NPts - 1, SSP%Nr ), SSP%Seg%r( SSP%Nr ), STAT = AllocateStatus )
@@ -403,6 +404,10 @@ END SUBROUTINE EvaluateSSP2D
        WRITE( PRTFile, * )
        WRITE( PRTFile, * ) 'Profile ranges (km):'
        WRITE( PRTFile, FMT="( F10.2 )"  ) SSP%Seg%r( 1 : SSP%Nr )
+       
+       IF ( .NOT. monotonic( SSP%Seg%r, SSP%Nr ) ) THEN
+          CALL ERROUT( 'sspMod: Quad', 'The ranges in the SSP must be monotone increasing' )
+       END IF
 
        SSP%Seg%r = 1000.0 * SSP%Seg%r   ! convert km to m
 
@@ -524,6 +529,9 @@ END SUBROUTINE EvaluateSSP2D
        !WRITE( PRTFile, * )
        !WRITE( PRTFile, * ) 'x-coordinates of SSP (km):'
        !WRITE( PRTFile, FMT="( F10.2 )"  ) SSP%Seg%x( 1 : SSP%Nx )
+       IF ( .NOT. monotonic( SSP%Seg%x, SSP%Nx ) ) THEN
+          CALL ERROUT( 'sspMod: Hexahedral', 'The x coordinates in the SSP must be monotone increasing' )
+       END IF
 
        ! y coordinates
        READ( SSPFile,  * ) SSP%Ny
@@ -535,6 +543,9 @@ END SUBROUTINE EvaluateSSP2D
        !WRITE( PRTFile, * )
        !WRITE( PRTFile, * ) 'y-coordinates of SSP (km):'
        !WRITE( PRTFile, FMT="( F10.2 )"  ) SSP%Seg%y( 1 : SSP%Ny )
+       IF ( .NOT. monotonic( SSP%Seg%y, SSP%Ny ) ) THEN
+          CALL ERROUT( 'sspMod: Hexahedral', 'The y coordinates in the SSP must be monotone increasing' )
+       END IF
 
        ! z coordinates
        READ( SSPFile,  * ) SSP%Nz
@@ -546,6 +557,9 @@ END SUBROUTINE EvaluateSSP2D
        !WRITE( PRTFile, * )
        !WRITE( PRTFile, * ) 'z-coordinates of SSP (km):'
        !WRITE( PRTFile, FMT="( F10.2 )"  ) SSP%Seg%z( 1 : SSP%Nz )
+       IF ( .NOT. monotonic( SSP%Seg%z, SSP%Nz ) ) THEN
+          CALL ERROUT( 'sspMod: Hexahedral', 'The z coordinates in the SSP must be monotone increasing' )
+       END IF
 
        ! SSP matrix should be bigger than 2x2x2
        IF ( SSP%Nx < 2 .OR. SSP%Ny < 2 .OR. SSP%Nz < 2 ) THEN
