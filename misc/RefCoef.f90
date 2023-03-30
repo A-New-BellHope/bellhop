@@ -3,6 +3,7 @@ MODULE RefCoef
   ! reflection coefficient data
 
   USE FatalError
+  USE monotonicMod
   SAVE
   INTEGER, PARAMETER            :: BRCFile = 31, TRCFile = 32, IRCFile = 12
   INTEGER                       :: NBotPts, NTopPts
@@ -51,6 +52,10 @@ CONTAINS
           CALL ERROUT( 'ReadReflectionCoefficient', 'Insufficient memory for bot. refl. coef.: reduce # points'  )
 
        READ(  BRCFile, * ) ( RBot( itheta ), itheta = 1, NBotPts )
+       IF ( .NOT. monotonic( RBot( : )%theta, NBotPts ) ) THEN
+          CALL ERROUT( 'ReadReflectionCoefficient', 'Bottom reflection coefficients must be monotonically increasing'  )
+       END IF
+       
        CLOSE( BRCFile )
        RBot%phi = DegRad * RBot%phi   ! convert to radians
 
@@ -80,6 +85,10 @@ CONTAINS
           CALL ERROUT( 'ReadReflectionCoefficient', 'Insufficient memory for top refl. coef.: reduce # points'  )
 
        READ(  TRCFile, * ) ( RTop( itheta ), itheta = 1, NTopPts )
+       IF ( .NOT. monotonic( RTop( : )%theta, NTopPts ) ) THEN
+          CALL ERROUT( 'ReadReflectionCoefficient', 'Top    reflection coefficients must be monotonically increasing'  )
+       END IF
+       
        CLOSE( TRCFile )
        RTop%phi = DegRad *  RTop%phi   ! convert to radians
     ELSE   ! should allocate something anyway, since variable is passed

@@ -278,6 +278,17 @@ In 3D SSP Hexahedral, `SSP%Nz` is assigned to `SSP%NPts` and `SSP%Seg%z` to
 `SSP%z`. However, the latter has a maximum of `MaxSSP` depth values, whereas
 the former did not have a check for exceeding this size. A check has been added.
 
+### Input vector monotonicity
+
+The handling of input data from the environment file or other input files which
+is not monotonically increasing is inconsistent. In some cases, such as source
+and receiver coordinates, the input data is sorted, so providing out-of-order
+input data is fully supported. In some cases, `BELLHOP(3D)` checks to ensure the
+input data is monotonically increasing. However, for SSP coordinates and
+reflection coefficients, `BELLHOP(3D)` assumes the input data is monotonically
+increasing without checking it. If it is not, this gives other errors later or
+garbage results. Checks have been added in these cases.
+
 ## Other issues
 
 ### Use of `TINY( )`
