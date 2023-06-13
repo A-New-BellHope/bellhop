@@ -5,7 +5,8 @@ MODULE WriteRay
 
   ! During an eigenray calculation, subsets of the full ray may be passed
   ! These have lengths Nsteps1 vs. Nsteps for the entire ray
-
+  ! (The subsampling is currently disabled by setting iSkip=1, but the logic is left in for optional use.)
+   
   USE BellhopMod
   USE sspMod
   IMPLICIT NONE

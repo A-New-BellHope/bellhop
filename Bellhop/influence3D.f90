@@ -153,8 +153,8 @@ CONTAINS
     REAL ( KIND=8 ), INTENT( IN  ) :: alpha, beta, Dalpha, Dbeta         ! ray take-off angle
     REAL ( KIND=8 ), INTENT( IN  ) :: x_rcvrMat( 2, Pos%Ntheta, Pos%NRr ), t_rcvr( 2, Pos%Ntheta ) ! rcvr coordinates and tangent
     COMPLEX        , INTENT( OUT ) :: P( Pos%Ntheta, Pos%Nrz, Pos%NRr )  ! complex pressure
-    INTEGER            :: irT( 1 ), irTT
-    REAL    ( KIND=8 ) :: s, rlen, x_ray( 3 ), n_ray_z( 3 ), n_ray_theta(3 ), &
+    INTEGER            :: irTT
+    REAL    ( KIND=8 ) :: rlen, x_ray( 3 ), n_ray_z( 3 ), n_ray_theta(3 ), &
          e1( 3 ), e2( 3 ), x_rcvr( 3 ), x_rcvr_ray( 3 ), &
          L_z, L_diag, e_theta( 3 ), m_prime, a, b, zMin, zMax, &
          Det_Q, Det_Qold
@@ -165,10 +165,8 @@ CONTAINS
     Det_QOld = ray3D( 1 )%DetQ   ! used to track phase changes at caustics (rotations of Det_Q)
 
     ! Compute nearest rcvr before normal
-    ! LP: Silly / partly dead code, see README.
-    rA  = NORM2( ray3D( 1 )%x( 1 : 2 ) - xs_3D( 1 : 2 ) )         ! range of ray point
-    irT = MINLOC( Pos%Rr( 1 : Pos%NRr ), MASK = Pos%Rr( 1 : Pos%NRr ) .GT. rA )        ! index of receiver
-    ir  = irT( 1 )
+    rA = 0.0   ! range of ray point
+    ir = 1     ! index of receiver
 
     Stepping: DO is = 2, Beam%Nsteps
        ! Compute nearest rcvr before normal
@@ -388,22 +386,6 @@ CONTAINS
        END DO
 
        Radials: DO itheta = 1, Pos%Ntheta
-          ! *** Compute coordinates of intercept: nA, mA, rA ***
-          is = 1
-          
-          ! LP: These values are immediately overwritten inside the loop. This
-          ! looks like an initialization of these values, and they're saved from
-          ! B to A at the end of the loop, but the computation of deltaA, mA,
-          ! and irA would have to be removed below.
-          deltaA = -DOT_PRODUCT( t_rcvr( :, itheta ), e1xe2( 1 : 2, is ) )
-
-          ! Check for ray normal || radial of rcvr line
-          IF ( ABS( deltaA ) < 1D3 * SPACING( deltaA ) ) THEN
-             irA = 0   ! serves as a flag that this normal can't be used
-          ELSE
-             mA  =  DOT_PRODUCT( t_rcvr( :, itheta ), xtxe1( 1 : 2, is ) ) / deltaA
-          END IF
-
           ! step along the beam ...
           ! Most of the time the beam makes no contribution to a receiver
           ! Therefore we try to test that quickly and move on to the next receiver
@@ -535,9 +517,6 @@ CONTAINS
                    WRITE( PRTFile, * ) 'Skipping b/c MaxRadius_m mA mB', MaxRadius_m( is - 1 ), mA, mB
                 END IF
              END IF
-             ! LP: These values are overwritten on the next loop; this does nothing.
-             mA     = mB
-             deltaA = deltaB
           END DO Stepping
        END DO Radials
     END DO ReceiverDepths
@@ -555,7 +534,7 @@ CONTAINS
     REAL ( KIND=8 ), INTENT( IN  ) :: alpha, beta, Dalpha, Dbeta         ! ray take-off angle
     REAL ( KIND=8 ), INTENT( IN  ) :: x_rcvrMat( 2, Pos%Ntheta, Pos%NRr ), t_rcvr( 2, Pos%Ntheta ) ! rcvr coordinates and tangent
     COMPLEX        , INTENT( OUT ) :: P( Pos%Ntheta, Pos%Nrz, Pos%NRr )  ! complex pressure
-    INTEGER            :: irT( 1 ), irTT
+    INTEGER            :: irTT
     REAL    ( KIND=8 ) :: rlen, a, b, x_ray( 3 ), n_ray_z( 3 ), n_ray_theta( 3 ), &
          e1( 3 ), e2( 3 ), x_rcvr( 3 ), x_rcvr_ray( 3 ), &
          L1_stent, L2_stent, L_z, L_diag, e_theta( 3 ), m_prime, zMin, zMax, &
@@ -569,9 +548,8 @@ CONTAINS
 
     ! Compute nearest rcvr before normal
     ! LP: Same issues as hat cart.
-    rA  = NORM2( ray3D( 1 )%x( 1 : 2 ) - xs_3D( 1 : 2 ) )         ! range of ray point
-    irT = MINLOC( Pos%Rr( 1 : Pos%NRr ), MASK = Pos%Rr( 1 : Pos%NRr ) .GT. rA )   ! index of receiver
-    ir  = irT( 1 )
+    rA  = 0.0   ! range of ray point
+    ir  = 1     ! index of receiver
 
     Stepping: DO is = 2, Beam%Nsteps
        lambda = ray3D( is - 1 )%c / freq   ! local wavelength

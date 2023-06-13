@@ -368,9 +368,9 @@ COMPLEX (KIND=8 ) FUNCTION PickEpsilon( BeamType, omega, c, gradc, alpha, Dalpha
   REAL      (KIND=8), INTENT( IN  ) :: epsMultiplier, Rloop ! multiplier to manually adjust result, loop range
   CHARACTER (LEN= 2), INTENT( IN  ) :: BeamType
   LOGICAL, SAVE      :: INIFlag = .TRUE.
-  REAL      (KIND=8) :: HalfWidth
+  REAL      (KIND=8) :: HalfWidth = 0.0
   REAL      (KIND=8) :: cz
-  COMPLEX   (KIND=8) :: epsilonOpt
+  COMPLEX   (KIND=8) :: epsilonOpt = 0.0
   CHARACTER (LEN=40) :: TAG
   
   ! LP: BUG: Multiple codepaths do not set epsilonOpt, leads to UB
@@ -398,7 +398,7 @@ COMPLEX (KIND=8 ) FUNCTION PickEpsilon( BeamType, omega, c, gradc, alpha, Dalpha
         ENDIF
      END SELECT
 
-  CASE ( 'G', 'g' ) ! LP: BUG: Missing ^
+  CASE ( 'G', 'g', '^' ) ! LP: BUG: Missing ^
      TAG        = 'Geometric hat beams'
      halfwidth  = 2.0 / ( ( omega / c ) * Dalpha )
      epsilonOpt = i * 0.5 * omega * halfwidth ** 2

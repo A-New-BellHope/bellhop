@@ -402,7 +402,7 @@ CONTAINS
                 
                 phase = KMAHphase( iS - 1 )
                 qOld = ray2D( is - 1 )%q( 1 )
-                CALL FinalPhase( .FALSE. )
+                CALL FinalPhase()
 
                 CALL ApplyContribution( U( iz, ir ) )
              END IF
@@ -496,7 +496,7 @@ CONTAINS
                    const    = Ratio1 * SQRT( ray2D( iS )%c / ABS( q ) ) * ray2D( iS )%Amp
                    W        = ( RadiusMax - n ) / RadiusMax   ! hat function: 1 on center, 0 on edge
                    Amp      = const * W
-                   CALL FinalPhase( .FALSE. )
+                   CALL FinalPhase()
 
                    CALL ApplyContribution( U( iz, ir ) )
                 END IF
@@ -603,9 +603,9 @@ CONTAINS
 
              RcvrDepths: DO iz = 1, NRz_per_range
                 IF ( Beam%RunType( 5 : 5 ) == 'I' ) THEN
-                   x_rcvr = [ Pos%Rr( ir ), Pos%Rz( ir ) ]   ! irregular   grid
+                   x_rcvr = [ Pos%Rr( ir ), DBLE( Pos%Rz( ir ) ) ]   ! irregular   grid
                 ELSE
-                   x_rcvr = [ Pos%Rr( ir ), Pos%Rz( iz ) ]   ! rectilinear grid
+                   x_rcvr = [ Pos%Rr( ir ), DBLE( Pos%Rz( iz ) ) ]   ! rectilinear grid
                 END IF
                 IF ( x_rcvr( 2 ) < zmin .OR. x_rcvr( 2 ) > zmax ) CYCLE RcvrDepths
 
@@ -624,7 +624,7 @@ CONTAINS
                    const    = Ratio1 * SQRT( ray2D( iS )%c / ABS( q ) ) * ray2D( iS )%Amp
                    W        = EXP( -0.5 * ( n / sigma ) ** 2 ) / ( sigma * A )   ! Gaussian decay
                    Amp      = const * W
-                   CALL FinalPhase( .TRUE. )
+                   CALL FinalPhase()
 
                    CALL ApplyContribution( U( iz, ir ) )
                 END IF
@@ -806,7 +806,7 @@ CONTAINS
 
     REAL,              PARAMETER       :: pi = 3.14159265
     INTEGER,           INTENT( IN    ) :: NRz, Nr
-    REAL,              INTENT( IN    ) :: r( Nr )         ! ranges
+    REAL     (KIND=8), INTENT( IN    ) :: r( Nr )         ! ranges
     REAL     (KIND=8), INTENT( IN    ) :: Dalpha, freq, c ! angular spacing between rays, source frequency, nominal sound speed
     COMPLEX,           INTENT( INOUT ) :: U( NRz, Nr )    ! Pressure field
     CHARACTER (LEN=5), INTENT( IN    ) :: RunType
@@ -871,27 +871,18 @@ CONTAINS
   
   ! **********************************************************************!
   
-  SUBROUTINE FinalPhase( isGaussian )
-    LOGICAL, INTENT( IN ) :: isGaussian
+  SUBROUTINE FinalPhase()
     INTEGER :: phaseStepNum
     
     ! phase shifts at caustics
     !!! this should be precomputed [LP: While IncPhaseIfCaustic can be
     ! precomputed, FinalPhase cannot, as it is dependent on the interpolated `q`
     ! value which is not known until the main run.]
-    ! LP: All 2D functions discard the ray point phase if the condition is met,
-    ! probably BUG
-    ! LP: 2D Gaussian Cartesian reads the phase from the current point, all
-    ! others (including 3D) read the phase from the previous point, probably BUG
-    IF ( isGaussian ) THEN
-       phaseStepNum = iS
-    ELSE
-       phaseStepNum = iS - 1
-    END IF
+    phaseStepNum = iS - 1
     
     phaseInt = ray2D( phaseStepNum )%Phase + phase
     IF ( IsAtCaustic( .TRUE. ) ) &
-       phaseInt = phase + pi / 2.
+       phaseInt = phaseInt + pi / 2.
     
   END SUBROUTINE FinalPhase
   

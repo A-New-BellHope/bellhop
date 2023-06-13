@@ -444,7 +444,7 @@ CONTAINS
     REAL     (KIND=8), INTENT( IN    ) :: freq     ! center / nominal frequency (wideband not supported)
     CHARACTER (LEN=2), INTENT( IN    ) :: AttenUnit
     TYPE( HSInfo ),    INTENT( INOUT ) :: HS
-    REAL     (KIND=8) :: Mz, vr, alpha2_f          ! values related to grain size
+    REAL     (KIND=8)                  :: Mz, vr, alpha2_f          ! values related to grain size
 
     ! Echo to PRTFile user's choice of boundary condition
 
@@ -553,8 +553,8 @@ CONTAINS
 
     LOGICAL,            INTENT( IN ) :: ThreeD
     CHARACTER (LEN=80), INTENT( IN ) :: FileRoot
-    REAL               :: atten
-    CHARACTER (LEN=10) :: PlotType
+    REAL      (KIND=8)               :: atten
+    CHARACTER (LEN=10)               :: PlotType
 
     SELECT CASE ( Beam%RunType( 1 : 1 ) )
     CASE ( 'R', 'E' )   ! Ray trace or Eigenrays
@@ -577,11 +577,11 @@ CONTAINS
 
        IF ( ThreeD ) THEN
           WRITE( ARRFile, * ) '''3D'''
+          WRITE( ARRFile, * ) freq
        ELSE
           WRITE( ARRFile, * ) '''2D'''
+          WRITE( ARRFile, * ) freq
        END IF
-
-       WRITE( ARRFile, * ) freq
 
        ! write source locations
 
@@ -606,11 +606,11 @@ CONTAINS
 
        IF ( ThreeD ) THEN
           WRITE( ARRFile ) '''3D'''
+          WRITE( ARRFile    ) SNGL( freq )
        ELSE
           WRITE( ARRFile ) '''2D'''
+          WRITE( ARRFile    ) SNGL( freq )
        END IF
-
-       WRITE( ARRFile    ) SNGL( freq )
 
        ! write source locations
 
@@ -643,7 +643,7 @@ CONTAINS
           PlotType = 'rectilin  '
        END SELECT
 
-       CALL WriteHeader( TRIM( FileRoot ) // '.shd', Title, REAL( freq ), atten, PlotType )
+       CALL WriteHeader( TRIM( FileRoot ) // '.shd', Title, freq, atten, PlotType )
     END SELECT
 
   END SUBROUTINE OpenOutputFiles

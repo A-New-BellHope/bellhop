@@ -8,7 +8,7 @@ MODULE ArrMod
   REAL,      PARAMETER :: PhaseTol = 0.05  ! arrivals with essentially the same phase are grouped into one
   INTEGER               :: MaxNArr
   INTEGER, ALLOCATABLE  :: NArr( :, : ), NArr3D( :, :, : )
-  REAL         (KIND=4) :: factor = 1.0
+  REAL         (KIND=8) :: factor = 1.0
 
   TYPE Arrival
      INTEGER :: NTopBnc, NBotBnc
@@ -94,7 +94,7 @@ CONTAINS
     ! ASCII output file
 
     INTEGER,           INTENT( IN ) :: Nrd, Nr
-    REAL,              INTENT( IN ) :: r( Nr )
+    REAL (KIND=8),     INTENT( IN ) :: r( Nr )
     CHARACTER (LEN=1), INTENT( IN ) :: SourceType
     INTEGER           :: ir, id, iArr
 
@@ -117,7 +117,7 @@ CONTAINS
              ! You can compress the output file a lot by putting in an explicit format statement here ...
              ! However, you'll need to make sure you keep adequate precision
              WRITE( ARRFile, * ) &
-                     factor * Arr( id, ir, iArr )%A,             &
+             SNGL( factor ) * Arr( id, ir, iArr )%A,             &
              SNGL( RadDeg ) * Arr( id, ir, iArr )%Phase,         &
                         REAL( Arr( id, ir, iArr )%delay ),       &
                        AIMAG( Arr( id, ir, iArr )%delay ),       &
@@ -140,7 +140,7 @@ CONTAINS
     ! Binary output file
 
     INTEGER,           INTENT( IN ) :: Nrd, Nr
-    REAL,              INTENT( IN ) :: r( Nr )
+    REAL (KIND=8),     INTENT( IN ) :: r( Nr )
     CHARACTER (LEN=1), INTENT( IN ) :: SourceType
     INTEGER           :: ir, id, iArr
 
@@ -163,8 +163,8 @@ CONTAINS
           DO iArr = 1, NArr( id, ir )
              ! integers written out as reals below for fast reading in Matlab
              WRITE( ARRFile ) &
-                  factor * Arr( id, ir, iArr )%A,           &
-            SNGL( RadDeg * Arr( id, ir, iArr )%Phase ),       &
+          SNGL( factor ) * Arr( id, ir, iArr )%A,             &
+            SNGL( RadDeg ) * Arr( id, ir, iArr )%Phase,       &
                            Arr( id, ir, iArr )%delay,         &
                            Arr( id, ir, iArr )%SrcDeclAngle,  &
                            Arr( id, ir, iArr )%RcvrDeclAngle, &
@@ -261,9 +261,9 @@ CONTAINS
     ! Writes the arrival data (Amplitude, delay for each eigenray)
     ! ASCII output file
 
-    INTEGER, INTENT( IN ) :: Ntheta, Nrd, Nr
-    REAL,    INTENT( IN ) :: r( Nr )
-    INTEGER               :: itheta, ir, id, iArr
+    INTEGER,       INTENT( IN ) :: Ntheta, Nrd, Nr
+    REAL (KIND=8), INTENT( IN ) :: r( Nr )
+    INTEGER                     :: itheta, ir, id, iArr
 
     WRITE( ARRFile, * ) MAXVAL( NArr3D( 1 : Ntheta,  1 : Nrd, 1 : Nr ) )
 
@@ -285,7 +285,7 @@ CONTAINS
                 ! However, you'll need to make sure you keep adequate precision
                 WRITE( ARRFile, * ) &
                      factor * Arr3D( itheta, id, ir, iArr )%A,             &
-                     RadDeg * Arr3D( itheta, id, ir, iArr )%Phase,         &
+                     SNGL( RadDeg ) * Arr3D( itheta, id, ir, iArr )%Phase, &
                         REAL( Arr3D( itheta, id, ir, iArr )%delay ),       &
                        AIMAG( Arr3D( itheta, id, ir, iArr )%delay ),       &
                               Arr3D( itheta, id, ir, iArr )%SrcDeclAngle,  &
@@ -309,9 +309,9 @@ CONTAINS
     ! Writes the arrival data (amplitude, delay for each eigenray)
     ! Binary output file
 
-    INTEGER, INTENT( IN ) :: Ntheta, Nrd, Nr
-    REAL,    INTENT( IN ) :: r( Nr )
-    INTEGER               :: itheta, ir, id, iArr
+    INTEGER, INTENT( IN )          :: Ntheta, Nrd, Nr
+    REAL (KIND=8),    INTENT( IN ) :: r( Nr )
+    INTEGER                        :: itheta, ir, id, iArr
     
     WRITE( ARRFile ) MAXVAL( NArr3D( 1 : Ntheta,  1 : Nrd, 1 : Nr ) )
 
@@ -332,7 +332,7 @@ CONTAINS
                 ! integers written out as reals below for fast reading in Matlab
                 WRITE( ARRFile ) &
                      factor * Arr3D( itheta, id, ir, iArr )%A,             &
-               SNGL( RadDeg * Arr3D( itheta, id, ir, iArr )%Phase ),       &
+               SNGL( RadDeg ) * Arr3D( itheta, id, ir, iArr )%Phase,       &
                               Arr3D( itheta, id, ir, iArr )%delay,         &
                               Arr3D( itheta, id, ir, iArr )%SrcDeclAngle,  &
                               Arr3D( itheta, id, ir, iArr )%SrcAzimAngle,  &

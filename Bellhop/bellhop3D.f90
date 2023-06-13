@@ -195,7 +195,7 @@ SUBROUTINE BellhopCore
            NArr3D = 0 ! LP: Zero out 3D arrival matrix
            
            ! IF ( r( 1 ) == 0.0 ) r( 1 ) = 1.0
-           xs_3D = [ Pos%sx( isx ), Pos%sy( isy ), Pos%sz( isz ) ]
+           xs_3D = [ Pos%sx( isx ), Pos%sy( isy ), DBLE( Pos%sz( isz ) ) ]
            WRITE( PRTFile, * )
            WRITE( PRTFile, "( 'xs = ', G11.3, 2X, G11.3, 2X, G11.3 )" ) xs_3D
 
@@ -422,8 +422,8 @@ SUBROUTINE PickEpsilon( BeamType, omega, c, Dalpha, Dbeta, rLoop, EpsMultiplier,
   COMPLEX   (KIND=8), INTENT( OUT ) :: epsilon( 2 )         ! beam initial conditions
   CHARACTER (LEN= 2), INTENT( IN  ) :: BeamType
   LOGICAL, SAVE      :: INIFlag = .TRUE.
-  REAL      (KIND=8) :: HalfWidth( 2 ) = [ 0.0, 0.0 ]
-  COMPLEX   (KIND=8) :: epsilonOpt( 2 )
+  REAL      (KIND=8) :: HalfWidth(  2 ) = [ 0.0, 0.0 ]
+  COMPLEX   (KIND=8) :: epsilonOpt( 2 ) = [ 0.0, 0.0 ]
   CHARACTER (LEN=80) :: TAG
   
   ! LP: BUG: Multiple codepaths do not set epsilonOpt, leads to UB
@@ -505,6 +505,9 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
 
   ! *** Initial conditions ***
 
+  iSegr = 1
+  iSegz = 1
+
   iSmallStepCtr = 0
   tinit = [ COS( alpha ), SIN( alpha ) ]
   tradial = [ COS( beta ), SIN( beta ) ]
@@ -524,6 +527,9 @@ SUBROUTINE TraceRay2D( alpha, beta, Amp0 )
   IsegTopy = 1
   IsegBotx = 1
   IsegBoty = 1
+  iSegx = 1
+  iSegy = 1
+  iSegz = 1
   t_o = RayToOceanT( ray2D( 1 )%t, tradial )
   CALL GetTopSeg3D( xs_3D, t_o, .TRUE. )   ! identify the top    segment above the source
   CALL GetBotSeg3D( xs_3D, t_o, .TRUE. )   ! identify the bottom segment below the source
