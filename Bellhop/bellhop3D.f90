@@ -192,7 +192,7 @@ SUBROUTINE BellhopCore
         Source_y: DO isy = 1, Pos%Nsy   ! loop over source y-coordinate
            P = 0.0 !  Zero out field matrix
            U = 0.0
-           NArr3D = 0 ! LP: Zero out 3D arrival matrix
+           NArr3D = 0 ! Zero out 3D arrival matrix
            
            ! IF ( r( 1 ) == 0.0 ) r( 1 ) = 1.0
            xs_3D = [ Pos%sx( isx ), Pos%sy( isy ), DBLE( Pos%sz( isz ) ) ]

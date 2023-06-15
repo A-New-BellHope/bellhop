@@ -155,7 +155,6 @@ CONTAINS
              cco = co * co
              ssi = si * si
 
-             ! LP: Missing divide by 0 check on si from 2D version re-added.
              IF ( si /= 0.0 ) THEN
                 delta = a * co / si / ( ck * sb * d )   ! Do we need an abs() on this???
              ELSE

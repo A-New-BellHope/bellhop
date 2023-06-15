@@ -78,8 +78,6 @@ CONTAINS
     ! *** Phase 2
 
     CALL EvaluateSSP3D( ray1%x, ray1%t, c1, cimag1, gradc1, cxx1, cyy1, czz1, cxy1, cxz1, cyz1, rho, freq, 'TAB' )
-    ! LP: Fixed; should be ray1%phi; ray2%phi would be uninitialized memory or
-    ! left over from the previous ray
     CALL RayNormal( ray1%t, ray1%phi, c1, e1, e2 )
     CALL Get_c_partials( cxx1, cxy1, cxz1, cyy1, cyz1, czz1, e1, e2, cnn1, cmn1, cmm1 ) ! Compute second partials of c along ray normals
     CALL ComputeDeltaPQ( ray1, c1, gradc1, cnn1, cmn1, cmm1, d_phi1, d_p_tilde1, d_p_hat1, d_q_tilde1, d_q_hat1)
@@ -101,8 +99,6 @@ CONTAINS
     !write( *, * ) 'final coord ', ray2%x, w0, w1
     
     ! Update other variables with this new h
-    ! LP: Fixed: ray2%phi now depends on hw0 & hw1 like the other parameters,
-    ! originally only depended on h and ray1 vars
     hw0 = h * w0
     hw1 = h * w1
     ray2%t   = ray0%t   - hw0 * gradc0 / csq0 - hw1 * gradc1 / csq1
@@ -269,13 +265,6 @@ CONTAINS
     ray1%q_tilde = ray0%q_tilde + h * d_q_tilde 
     ray1%p_hat   = ray0%p_hat   + h * d_p_hat
     ray1%q_hat   = ray0%q_hat   + h * d_q_hat 
-    
-    ! LP: no longer missing the hw0 / hw1 blend
-    ! ray1%f    = ray0%f    + h * d_f
-    ! ray1%g    = ray0%g    + h * d_g
-    ! ray1%h    = ray0%h    + h * d_h
-    ! ray1%DetP = ray0%DetP + h * d_DetP
-    ! ray1%DetQ = ray0%DetQ + h * d_DetQ
 
   END SUBROUTINE UpdateRayPQ
 
@@ -396,7 +385,6 @@ CONTAINS
        ySeg( 2 ) = MIN( ySeg( 2 ), SSP%Seg%y( iSegy0 + 1 ) )
     END IF
 
-    ! LP: removed 1000 * epsilon which mbp had comment questioning also
     IF ( ABS( urayt( 2 ) ) > EPSILON( hySeg ) ) THEN
        IF          ( x(  2 ) < ySeg( 1 ) ) THEN
           hySeg = -( x0( 2 ) - ySeg( 1 ) ) / urayt( 2 )
@@ -628,7 +616,6 @@ CONTAINS
        ySeg( 2 ) = MIN( ySeg( 2 ), SSP%Seg%y( iSegy0 + 1 ) )
     END IF
 
-    ! LP: removed 1000 * epsilon which mbp had comment questioning also
     IF ( ABS( urayt( 2 ) ) > EPSILON( h ) ) THEN
        IF       ( x2( 2 ) < ySeg( 1 ) ) THEN
           h  = -( x0( 2 ) - ySeg( 1 ) ) / urayt( 2 )

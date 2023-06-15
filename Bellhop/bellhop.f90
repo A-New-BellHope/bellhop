@@ -119,7 +119,7 @@ PROGRAM BELLHOP
 
      ALLOCATE( RBot( 1 ), Stat = IAllocStat )   ! bottom reflection coefficient
      ALLOCATE( RTop( 1 ), Stat = iAllocStat )   ! top    reflection coefficient
-     NBotPts = 1 ! LP: missing initialization
+     NBotPts = 1
      NTopPts = 1
 
      ! *** Source Beam Pattern ***
@@ -240,12 +240,6 @@ SUBROUTINE BellhopCore
         NArr = 0
      END SELECT
 
-     ! LP: This initialization was missing (only done once globally). In some
-     ! cases (a source on a boundary), in conjunction with other subtle issues,
-     ! the missing initialization caused the initial state of one ray to be
-     ! dependent on the final state of the previous ray, which is obviously
-     ! non-physical.
-     ! This initialization is here in addition to TraceRay2D because of EvaluateSSP.
      iSegz = 1
      iSegr = 1
      
@@ -398,7 +392,7 @@ COMPLEX (KIND=8 ) FUNCTION PickEpsilon( BeamType, omega, c, gradc, alpha, Dalpha
         ENDIF
      END SELECT
 
-  CASE ( 'G', 'g', '^' ) ! LP: BUG: Missing ^
+  CASE ( 'G', 'g', '^' )
      TAG        = 'Geometric hat beams'
      halfwidth  = 2.0 / ( ( omega / c ) * Dalpha )
      epsilonOpt = i * 0.5 * omega * halfwidth ** 2
@@ -453,10 +447,6 @@ SUBROUTINE TraceRay2D( xs, alpha, Amp0 )
 
   ! Initial conditions
   
-  ! LP: This initialization was missing (only done once globally). In some cases
-  ! (a source on a boundary), in conjunction with other subtle issues, the
-  ! missing initialization caused the initial state of one ray to be dependent
-  ! on the final state of the previous ray, which is obviously non-physical.
   iSegz = 1
   iSegr = 1
 

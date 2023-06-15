@@ -44,7 +44,6 @@ CONTAINS
     INTEGER,            INTENT( IN ) :: PRTFile
     CHARACTER (LEN= 1), INTENT( IN ) :: TopATI
     REAL      (KIND=8), INTENT( IN ) :: DepthT
-    ! REAL      (KIND=8), ALLOCATABLE  :: phi( : ) ! LP: Removed as seems to have been moved to ComputeBdryTangentNormal
     CHARACTER (LEN=80), INTENT( IN ) :: FileRoot
 
     SELECT CASE ( TopATI )
@@ -74,7 +73,6 @@ CONTAINS
        NatiPts = NatiPts + 2   ! we'll be extending the altimetry to infinity to the left and right
 
        ALLOCATE( Top( NatiPts ), Stat = IAllocStat )
-       ! ALLOCATE( phi( NatiPts ), Stat = IAllocStat ) ! LP: Removed as seems to have been moved to ComputeBdryTangentNormal
        IF ( IAllocStat /= 0 ) &
             CALL ERROUT( 'BELLHOP:ReadATI', 'Insufficient memory for altimetry data: reduce # ati points' )
 
@@ -86,15 +84,12 @@ CONTAINS
           SELECT CASE ( atiType( 2 : 2 ) )
           CASE ( 'S', '' )
              READ(  ATIFile, * ) Top( ii )%x
-             ! LP: This condition was previously ii == NatiPts,
-             ! which will never be satisfied due to the loop bounds
              IF ( ii < Number_to_Echo .OR. ii == NatiPts - 1 ) THEN   ! echo some values
                 WRITE( PRTFile, FMT = "(2G11.3)" ) Top( ii )%x
              END IF
           CASE ( 'L' )
              READ(  ATIFile, * )                   Top( ii )%x, Top( ii )%HS%alphaR, Top( ii )%HS%betaR, Top( ii )%HS%rho, &
                                                                 Top( ii )%HS%alphaI, Top( ii )%HS%betaI
-             ! LP: Same change as above
              IF ( ii < Number_to_Echo .OR. ii == NatiPts - 1 ) THEN   ! echo some values
                 WRITE( PRTFile, FMT = "(7G11.3)" ) Top( ii )%x, Top( ii )%HS%alphaR, Top( ii )%HS%betaR, Top( ii )%HS%rho, &
                                                                 Top( ii )%HS%alphaI, Top( ii )%HS%betaI
@@ -186,15 +181,12 @@ CONTAINS
           SELECT CASE ( btyType( 2 : 2 ) )
           CASE ( 'S', '' )   ! short format
              READ(  BTYFile, * ) Bot( ii )%x
-             ! LP: This condition was previously ii == NbtyPts,
-             ! which will never be satisfied due to the loop bounds
              IF ( ii < Number_to_Echo .OR. ii == NbtyPts - 1 ) THEN   ! echo some values
                 WRITE( PRTFile, FMT = "(2G11.3)" ) Bot( ii )%x
              END IF
           CASE ( 'L' )       ! long format
              READ(  BTYFile, * )                   Bot( ii )%x, Bot( ii )%HS%alphaR, Bot( ii )%HS%betaR, Bot( ii )%HS%rho, &
                                                                 Bot( ii )%HS%alphaI, Bot( ii )%HS%betaI
-             ! LP: Same change as above
              IF ( ii < Number_to_Echo .OR. ii == NbtyPts - 1 ) THEN   ! echo some values
                 WRITE( PRTFile, FMT="( F10.2, F10.2, 3X, 2F10.2, 3X, F6.2, 3X, 2F10.4 )" ) &
                                                    Bot( ii )%x, Bot( ii )%HS%alphaR, Bot( ii )%HS%betaR, Bot( ii )%HS%rho, &
@@ -332,7 +324,7 @@ CONTAINS
           Bdry( ii )%kappa = Bdry( ii )%Dss   !over-ride kappa !!!!!
        END DO
        
-       DEALLOCATE( phi ) ! LP: was missing deallocation
+       DEALLOCATE( phi )
     ELSE
        Bdry%kappa = 0
     END IF

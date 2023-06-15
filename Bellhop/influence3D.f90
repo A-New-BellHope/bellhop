@@ -763,7 +763,7 @@ CONTAINS
 
     REAL ( KIND=8 ), INTENT( IN    ) :: alpha, beta         ! ray take-off angle
     COMPLEX,         INTENT( INOUT ) :: U
-    REAL ( KIND=8 )                  :: rayt2( 3 ) ! LP: Don't want to clobber rayt!
+    REAL ( KIND=8 )                  :: rayt2( 3 )
 
     SELECT CASE( Beam%RunType( 1 : 1 ) )
     CASE ( 'E' )      ! eigenrays

@@ -23,7 +23,7 @@ CONTAINS
     INTEGER,          INTENT( IN    ) :: IBeamWindow2
     REAL    (KIND=8), INTENT( IN    ) :: alpha, RadiusMax                ! take-off angle
     COMPLEX,          INTENT( INOUT ) :: U( NRz_per_range, Pos%NRr )  ! complex pressure field
-    COMPLEX (KIND=8), INTENT( IN    ) :: eps                          ! LP: EPSILON is an intrinsic
+    COMPLEX (KIND=8), INTENT( IN    ) :: eps
     INTEGER          :: ir1, ir2, KMAHV( MaxN ), KMAH, image
     REAL    (KIND=8) :: nA, nB, nSq, c, zr, Polarity
     REAL    (KIND=8) :: znV( Beam%Nsteps ), rnV( Beam%Nsteps )   ! ray normal
@@ -88,7 +88,6 @@ CONTAINS
              ! Compute ray-centered coordinates, (znV, rnV)
 
              ! If normal parallel to TL-line, skip to next step on ray
-             ! LP: Changed from TINY( znV( iS ) ), see README.md.
              IF ( ABS( znV( iS ) ) < EPSILON( znV( iS ) ) ) CYCLE Stepping
 
              SELECT CASE ( image )     ! Images of beams
@@ -175,7 +174,7 @@ CONTAINS
     INTEGER,          INTENT( IN    ) :: IBeamWindow2
     REAL    (KIND=8), INTENT( IN    ) :: alpha, RadiusMax                ! take-off angle
     COMPLEX,          INTENT( INOUT ) :: U( NRz_per_range, Pos%NRr )  ! complex pressure field
-    COMPLEX (KIND=8), INTENT( IN    ) :: eps                          ! LP: EPSILON is an intrinsic
+    COMPLEX (KIND=8), INTENT( IN    ) :: eps
     INTEGER          :: KMAHV( MaxN ), KMAH, irA, irB, Image
     REAL    (KIND=8) :: x( 2 ), rayt( 2 ), rayn( 2 ), Tr, Tz, zr, Polarity = 1, &
          c, cimag, cs, cn, csq, gradc( 2 ), crr, crz, czz, rho, deltaz
